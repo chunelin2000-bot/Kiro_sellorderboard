@@ -61,9 +61,10 @@
             <th>收件人</th>
             <th>電話</th>
             <th>地址</th>
-            <th>商品名稱</th>
-            <th>數量</th>
+            <th>商品明細</th>
+            <th>總數量</th>
             <th>物流方式</th>
+            <th>訂單金額</th>
           </tr>
         </thead>
         <tbody></tbody>
@@ -126,10 +127,14 @@
       </div>
     </div>
 
-    <!-- 近 7 日訂單趨勢 -->
-    <h3>近 7 日訂單趨勢</h3>
-    <div id="trend-chart" class="trend-chart">
-      <svg id="trend-svg" width="100%" height="200" role="img" aria-label="近 7 日訂單趨勢長條圖"></svg>
+    <!-- 營收與訂單合併圖（依所選時間範圍動態呈現） -->
+    <h3 id="revenue-chart-title">營收與訂單趨勢</h3>
+    <div class="chart-legend">
+      <span class="legend-item"><span class="legend-bar"></span>營收（長條）</span>
+      <span class="legend-item"><span class="legend-line"></span>訂單數（折線）</span>
+    </div>
+    <div id="revenue-chart" class="trend-chart">
+      <svg id="revenue-svg" width="100%" height="240" role="img" aria-label="營收與訂單趨勢合併圖"></svg>
     </div>
 
     <!-- 熱銷 TOP 5 -->
@@ -141,17 +146,11 @@
             <th>排名</th>
             <th>商品名稱</th>
             <th>銷售數量</th>
-            <th>銷售金額</th>
+            <th>出現訂單數</th>
           </tr>
         </thead>
         <tbody></tbody>
       </table>
-    </div>
-
-    <!-- 營收比較（依所選時間範圍動態呈現） -->
-    <h3 id="revenue-chart-title">營收比較</h3>
-    <div id="revenue-chart" class="trend-chart">
-      <svg id="revenue-svg" width="100%" height="220" role="img" aria-label="營收比較長條圖"></svg>
     </div>
 
     <!-- 產品別營收比較 -->
