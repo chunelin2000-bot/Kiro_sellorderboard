@@ -45,7 +45,7 @@
   - **Verification:** 桌面版面整齊；375px 響應式正常；列印預覽正確；duplicate class 有背景色
 
 - [x] 3. 模擬資料與互動邏輯：建立 docs/app.js 完成所有功能
-  - 頂部定義固定模擬資料（Pinkoi + CYBERBIZ）
+  - 頂部定義固定模擬資料（Pinkoi 20 筆 + CYBERBIZ 15 筆，共 35 筆）
   - Tab 切換邏輯
   - 載入範例按鈕事件
   - CSV 上傳 FileReader 解析
