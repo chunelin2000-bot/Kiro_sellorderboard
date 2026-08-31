@@ -25,7 +25,7 @@
   - 建立 `index.html`，以相對路徑引用 `styles.css` 與 `app.js`
   - 加入 viewport meta 標籤
   - 建立三個 Tab 按鈕：訂單匯入、出貨列印、銷售儀表板
-  - Tab 1：檔案上傳 input、「載入蝦皮範例」「載入 MOMO 範例」按鈕、原始預覽表格容器、平台篩選 select、清洗結果表格容器
+  - Tab 1：檔案上傳 input、「載入範例資料（Pinkoi + CYBERBIZ）」按鈕、原始預覽表格容器、平台篩選 select、清洗結果表格容器
   - Tab 2：「產生出貨單」「產生揀貨單」「列印」按鈕、列印版面容器
   - Tab 3：三張摘要卡片、占比橫條容器、SVG 趨勢圖容器、熱銷 TOP 5 表格
   - 所有 UI 文字使用繁體中文
@@ -45,12 +45,12 @@
   - **Verification:** 桌面版面整齊；375px 響應式正常；列印預覽正確；duplicate class 有背景色
 
 - [x] 3. 模擬資料與互動邏輯：建立 docs/app.js 完成所有功能
-  - 頂部定義固定模擬資料（蝦皮 15 筆 + MOMO 15 筆）
+  - 頂部定義固定模擬資料（Pinkoi + CYBERBIZ）
   - Tab 切換邏輯
   - 載入範例按鈕事件
   - CSV 上傳 FileReader 解析
   - 非 CSV 副檔名錯誤提示
-  - 欄位對照函式（蝦皮→統一、MOMO→統一）
+  - 欄位對照函式（Pinkoi→統一、CYBERBIZ→統一）
   - 清洗結果渲染，重複訂單加 `.duplicate`
   - 平台篩選下拉過濾
   - 出貨單 HTML 產生（每筆一張）
