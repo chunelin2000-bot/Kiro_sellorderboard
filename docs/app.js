@@ -442,25 +442,76 @@ function colRefToIndex(ref) {
   return idx - 1;
 }
 
-// ===== 載入範例 =====
-document.getElementById('btn-pinkoi').addEventListener('click', function() {
-  loadExample(mockPinkoi);
-});
-
-document.getElementById('btn-cyberbiz').addEventListener('click', function() {
-  loadExample(mockCyberbiz);
+// ===== 載入範例（Pinkoi + CYBERBIZ 合併，供展示用） =====
+document.getElementById('btn-example').addEventListener('click', function() {
+  loadExample(mockPinkoi.concat(mockCyberbiz));
 });
 
 function loadExample(data) {
   uploadError.hidden = true;
   currentOrders = data;
   importStatus.hidden = false;
-  importStatus.textContent = '已載入範例，共 ' + data.length + ' 筆訂單' +
+  importStatus.textContent = '已載入範例資料，共 ' + data.length + ' 筆訂單' +
     (data.length > 5 ? '（預覽顯示前 5 筆）' : '') + '。';
   renderPreviewFromOrders(data.slice(0, 5));
   renderCleanedTable(data);
-  // 儀表板改用剛載入的範例重新渲染
   renderDashboard();
+}
+
+// ===== 清除資料 =====
+document.getElementById('btn-clear').addEventListener('click', function() {
+  currentOrders = [];
+  uploadError.hidden = true;
+  importStatus.hidden = true;
+  // 清空預覽與清洗表格
+  document.getElementById('preview-table').querySelector('thead').innerHTML = '';
+  document.getElementById('preview-table').querySelector('tbody').innerHTML = '';
+  document.getElementById('cleaned-table').querySelector('tbody').innerHTML = '';
+  document.getElementById('print-area').innerHTML = '';
+  // 儀表板回到內建模擬資料
+  renderDashboard();
+});
+
+// ===== 匯出清洗結果為 CSV =====
+document.getElementById('btn-export').addEventListener('click', function() {
+  if (currentOrders.length === 0) {
+    uploadError.textContent = '尚無資料可匯出，請先上傳訂單或載入範例。';
+    uploadError.hidden = false;
+    return;
+  }
+  var csv = ordersToCsv(currentOrders);
+  // 加上 UTF-8 BOM，讓 Excel 開啟時中文不亂碼
+  var blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = '清洗結果_' + new Date().toISOString().slice(0, 10) + '.csv';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+});
+
+// 將統一訂單轉為 CSV 文字（每筆訂單一列，商品明細合併）
+function ordersToCsv(orders) {
+  var headers = ['訂單編號', '平台', '日期', '收件人', '電話', '地址', '商品明細', '總數量', '物流方式', '訂單金額'];
+  var lines = [headers.map(csvCell).join(',')];
+  orders.forEach(function(o) {
+    lines.push([
+      o.orderId, o.platform, o.date, o.recipient, o.phone, o.address,
+      orderItemsText(o), orderQty(o), o.logistics, o.amount
+    ].map(csvCell).join(','));
+  });
+  return lines.join('\r\n');
+}
+
+// CSV 儲存格跳脫：含逗號/引號/換行時以雙引號包裹，內部引號加倍
+function csvCell(v) {
+  var s = String(v == null ? '' : v);
+  if (/[",\r\n]/.test(s)) {
+    return '"' + s.replace(/"/g, '""') + '"';
+  }
+  return s;
 }
 
 // ===== 原始預覽（表格式，統一訂單格式） =====

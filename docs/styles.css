@@ -151,6 +151,22 @@ h3 { margin: 20px 0 8px; }
   background: #357abd;
 }
 
+/* 清除資料：中性灰 */
+#btn-clear {
+  background: #8a8f99;
+}
+#btn-clear:hover {
+  background: #71767f;
+}
+
+/* 匯出：綠色，與上傳按鈕呼應 */
+#btn-export {
+  background: #2e9e6b;
+}
+#btn-export:hover {
+  background: #268159;
+}
+
 /* === 篩選列 === */
 .filter-row {
   margin: 16px 0;
