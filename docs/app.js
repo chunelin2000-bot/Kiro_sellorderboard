@@ -650,22 +650,31 @@ document.getElementById('platform-filter').addEventListener('change', function()
   if (currentOrders.length > 0) renderCleanedTable(currentOrders);
 });
 
-// ===== 出貨列印：以下拉選單切換單據類型，共用單一顯示區 =====
+// ===== 出貨列印：以下拉選單切換單據類型與平台，共用單一顯示區 =====
 var docTypeSelect = document.getElementById('doc-type');
+var docPlatformSelect = document.getElementById('doc-platform');
 var docArea = document.getElementById('doc-area');
 var btnGenerate = document.getElementById('btn-generate');
 var btnPrintDoc = document.getElementById('btn-print-doc');
 
-// 產生出貨單 HTML
-function buildShippingHtml() {
+// 依所選平台篩選目前訂單
+function filteredDocOrders() {
+  var pf = docPlatformSelect.value;
+  return pf === 'all' ? currentOrders : currentOrders.filter(function(o) { return o.platform === pf; });
+}
+
+// 產生出貨單 HTML（一筆訂單一張，含訂單日期與多項商品）
+function buildShippingHtml(orders) {
   var html = '';
-  currentOrders.forEach(function(o) {
+  orders.forEach(function(o) {
     var itemRows = o.items.map(function(it) {
       return '<li>' + escapeHtml(it.product) + ' × ' + it.quantity + '</li>';
     }).join('');
     html += '<div class="shipping-label">' +
       '<h4>出貨單</h4>' +
       '<p><strong>訂單編號：</strong>' + escapeHtml(o.orderId) + '</p>' +
+      '<p><strong>平台：</strong>' + escapeHtml(o.platform) + '</p>' +
+      '<p><strong>訂單日期：</strong>' + escapeHtml(o.date) + '</p>' +
       '<p><strong>收件人：</strong>' + escapeHtml(o.recipient) + '</p>' +
       '<p><strong>電話：</strong>' + escapeHtml(o.phone) + '</p>' +
       '<p><strong>地址：</strong>' + escapeHtml(o.address) + '</p>' +
@@ -677,9 +686,9 @@ function buildShippingHtml() {
 }
 
 // 產生揀貨單 HTML（依商品彙總）
-function buildPickingHtml() {
+function buildPickingHtml(orders) {
   var groups = {};
-  currentOrders.forEach(function(o) {
+  orders.forEach(function(o) {
     o.items.forEach(function(it) {
       if (!groups[it.product]) groups[it.product] = { qty: 0, orders: [] };
       groups[it.product].qty += it.quantity;
@@ -698,26 +707,39 @@ function buildPickingHtml() {
   return html;
 }
 
-// 產生：依所選單據類型渲染到共用顯示區
+// 清空顯示區並停用列印（切換類型或平台時使用）
+function resetDocArea() {
+  docArea.innerHTML = '<p class="doc-empty">已變更選項，請點「產生」。</p>';
+  btnPrintDoc.disabled = true;
+}
+
+// 產生：依所選單據類型與平台渲染到共用顯示區
 btnGenerate.addEventListener('click', function() {
   if (currentOrders.length === 0) {
     docArea.innerHTML = '<p class="doc-empty">請先於「訂單匯入」載入訂單資料。</p>';
     btnPrintDoc.disabled = true;
     return;
   }
+  var orders = filteredDocOrders();
+  if (orders.length === 0) {
+    docArea.innerHTML = '<p class="doc-empty">所選平台無訂單資料。</p>';
+    btnPrintDoc.disabled = true;
+    return;
+  }
   var type = docTypeSelect.value;
-  docArea.innerHTML = (type === 'picking') ? buildPickingHtml() : buildShippingHtml();
+  docArea.innerHTML = (type === 'picking') ? buildPickingHtml(orders) : buildShippingHtml(orders);
   btnPrintDoc.disabled = false;  // 產生後才可列印
 });
 
 // 切換單據類型時清空顯示區，避免列印到舊單據
 docTypeSelect.addEventListener('change', function() {
-  docArea.innerHTML = '<p class="doc-empty">已切換為「' +
-    (docTypeSelect.value === 'picking' ? '揀貨單' : '出貨單') + '」，請點「產生」。</p>';
-  btnPrintDoc.disabled = true;
+  resetDocArea();
   // 產生按鈕顏色隨類型變化（出貨單藍、揀貨單琥珀）
   btnGenerate.className = 'doc-btn ' + (docTypeSelect.value === 'picking' ? 'doc-btn-picking' : 'doc-btn-shipping');
 });
+
+// 切換平台時同樣清空顯示區
+docPlatformSelect.addEventListener('change', resetDocArea);
 
 // 列印目前顯示的單據
 btnPrintDoc.addEventListener('click', function() {
