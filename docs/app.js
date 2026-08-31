@@ -219,6 +219,7 @@ function finishImport(orders, fileNames) {
     return;
   }
   currentOrders = orders;
+  reviewStatus = {};  // 新資料匯入，清空舊的確認狀態
   // 狀態列：顯示檔案數與訂單數
   importStatus.hidden = false;
   importStatus.textContent = '已載入 ' + fileNames.length + ' 個檔案，共 ' + orders.length +
@@ -450,6 +451,7 @@ document.getElementById('btn-example').addEventListener('click', function() {
 function loadExample(data) {
   uploadError.hidden = true;
   currentOrders = data;
+  reviewStatus = {};  // 載入範例，清空舊的確認狀態
   importStatus.hidden = false;
   importStatus.textContent = '已載入範例資料，共 ' + data.length + ' 筆訂單' +
     (data.length > 5 ? '（預覽顯示前 5 筆）' : '') + '。';
@@ -461,12 +463,16 @@ function loadExample(data) {
 // ===== 清除資料 =====
 document.getElementById('btn-clear').addEventListener('click', function() {
   currentOrders = [];
+  reviewStatus = {};  // 清除資料時一併清空確認狀態
   uploadError.hidden = true;
   importStatus.hidden = true;
   // 清空預覽與清洗表格
   document.getElementById('preview-table').querySelector('thead').innerHTML = '';
   document.getElementById('preview-table').querySelector('tbody').innerHTML = '';
   document.getElementById('cleaned-table').querySelector('tbody').innerHTML = '';
+  // 清空異常彙總條
+  var summaryEl = document.getElementById('issue-summary');
+  if (summaryEl) { summaryEl.className = 'issue-summary'; summaryEl.textContent = ''; }
   // 清空單據顯示區並停用列印按鈕
   document.getElementById('doc-area').innerHTML = '<p class="doc-empty">請選擇單據類型並點「產生」。</p>';
   document.getElementById('btn-print-doc').disabled = true;
@@ -618,31 +624,218 @@ function normalizeDate(d) {
   return datePart;
 }
 
-// ===== 清洗結果表格（一列一筆訂單） =====
+// ===== 異常偵測 =====
+// 為每筆訂單標記穩定 key（用於保存確認狀態），以編號 + 索引避免重複編號互相覆蓋
+function orderKey(o, index) {
+  return (o.orderId || '無編號') + '#' + index;
+}
+
+// 取得今天 23:59:59 的時間戳，避免「今天成立」的訂單被誤判為未來
+function endOfToday() {
+  var now = new Date();
+  return new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999).getTime();
+}
+
+// 偵測單筆訂單的異常，回傳異常陣列 [{type, field, message}]
+// dupIds：重複出現的訂單編號集合（在整份清單層級計算後傳入）
+function detectOrderIssues(o, dupIds, todayEnd) {
+  var issues = [];
+
+  // 1. 訂單日期在未來
+  if (o.date) {
+    var t = new Date(o.date).getTime();
+    if (!isNaN(t) && t > todayEnd) {
+      issues.push({ type: 'future-date', field: 'date', message: '訂單日期在未來（' + o.date + '），可能為輸入錯誤' });
+    }
+  }
+
+  // 2. 訂單金額為 0
+  if (!(o.amount > 0)) {
+    issues.push({ type: 'zero-amount', field: 'amount', message: '訂單金額為 0，可能缺少金額或對應錯誤' });
+  }
+
+  // 3. 重複訂單編號
+  if (o.orderId && dupIds[o.orderId]) {
+    issues.push({ type: 'duplicate-id', field: 'orderId', message: '訂單編號重複（' + o.orderId + '），可能為重複匯入' });
+  }
+
+  return issues;
+}
+
+// 確認狀態儲存：key -> 'confirmed' | 'recheck'（未設定表示尚未處理）
+var reviewStatus = {};
+
+// ===== 清洗結果表格（一列一筆訂單，含異常警示） =====
 function renderCleanedTable(orders) {
   var pf = document.getElementById('platform-filter').value;
   var filtered = pf === 'all' ? orders : orders.filter(function(o) { return o.platform === pf; });
 
+  // 重複訂單編號：在篩選後的清單層級計算
   var idCount = {};
   filtered.forEach(function(o) { idCount[o.orderId] = (idCount[o.orderId] || 0) + 1; });
+  var dupIds = {};
+  Object.keys(idCount).forEach(function(id) { if (idCount[id] > 1) dupIds[id] = true; });
+
+  var todayEnd = endOfToday();
+
+  // 統計各類異常數量（用於頂部彙總警示條 B），且僅計入尚未「確認無誤」的異常
+  var counts = { 'future-date': 0, 'zero-amount': 0, 'duplicate-id': 0 };
+  var pendingIssueOrders = 0;
 
   var tbody = document.getElementById('cleaned-table').querySelector('tbody');
   tbody.innerHTML = '';
-  filtered.forEach(function(o) {
-    var dup = idCount[o.orderId] > 1 ? ' class="duplicate"' : '';
-    tbody.innerHTML += '<tr' + dup + '>' +
-      '<td>' + escapeHtml(o.orderId) + '</td>' +
+
+  filtered.forEach(function(o, index) {
+    var key = orderKey(o, index);
+    var issues = detectOrderIssues(o, dupIds, todayEnd);
+    var status = reviewStatus[key] || (issues.length > 0 ? 'pending' : '');
+    var confirmed = status === 'confirmed';
+
+    // 彙總計數：只計尚未確認無誤的異常
+    if (issues.length > 0 && !confirmed) {
+      pendingIssueOrders++;
+      issues.forEach(function(iss) { counts[iss.type]++; });
+    }
+
+    // 該筆各欄位的異常對照，方便標色與 tooltip
+    var fieldIssue = {};
+    issues.forEach(function(iss) { fieldIssue[iss.field] = iss; });
+
+    // 列的 class：有異常且未確認 → issue-row；已確認 → confirmed-row
+    var rowClass = '';
+    if (issues.length > 0) {
+      rowClass = confirmed ? 'confirmed-row' : 'issue-row';
+    }
+
+    // 儲存格輔助：套用異常標色與 ⚠ 圖示
+    function cell(field, inner) {
+      var iss = fieldIssue[field];
+      if (iss && !confirmed) {
+        return '<td class="cell-issue" title="' + escapeHtml(iss.message) + '">⚠ ' + inner + '</td>';
+      }
+      return '<td>' + inner + '</td>';
+    }
+
+    // 日期與金額為可就地編輯欄位（僅在該欄為異常且未確認時提供輸入框）
+    var dateCell;
+    if (fieldIssue.date && !confirmed) {
+      dateCell = '<td class="cell-issue" title="' + escapeHtml(fieldIssue.date.message) + '">⚠ ' +
+        '<input type="date" class="edit-input" data-key="' + escapeHtml(key) + '" data-field="date" value="' + escapeHtml(o.date) + '"></td>';
+    } else {
+      dateCell = '<td>' + escapeHtml(o.date) + '</td>';
+    }
+
+    var amountCell;
+    if (fieldIssue.amount && !confirmed) {
+      amountCell = '<td class="cell-issue" title="' + escapeHtml(fieldIssue.amount.message) + '">⚠ $' +
+        '<input type="number" min="0" class="edit-input edit-amount" data-key="' + escapeHtml(key) + '" data-field="amount" value="' + o.amount + '"></td>';
+    } else {
+      amountCell = '<td>$' + o.amount.toLocaleString() + '</td>';
+    }
+
+    // 處理狀態欄（C）：有異常才顯示按鈕
+    var actionCell;
+    if (issues.length === 0) {
+      actionCell = '<td class="review-cell"><span class="review-ok">正常</span></td>';
+    } else if (confirmed) {
+      actionCell = '<td class="review-cell"><span class="review-badge confirmed">已確認</span>' +
+        '<button class="review-btn review-reset" data-key="' + escapeHtml(key) + '" data-action="reset">還原</button></td>';
+    } else {
+      var recheckActive = status === 'recheck' ? ' active' : '';
+      actionCell = '<td class="review-cell">' +
+        '<button class="review-btn review-confirm" data-key="' + escapeHtml(key) + '" data-action="confirm">確認無誤</button>' +
+        '<button class="review-btn review-recheck' + recheckActive + '" data-key="' + escapeHtml(key) + '" data-action="recheck">需檢查</button>' +
+        '</td>';
+    }
+
+    var idInner = escapeHtml(o.orderId);
+    var tr = '<tr class="' + rowClass + '">' +
+      cell('orderId', idInner) +
       '<td>' + escapeHtml(o.platform) + '</td>' +
-      '<td>' + escapeHtml(o.date) + '</td>' +
+      dateCell +
       '<td>' + escapeHtml(o.recipient) + '</td>' +
       '<td>' + escapeHtml(o.phone) + '</td>' +
       '<td>' + escapeHtml(o.address) + '</td>' +
       '<td>' + escapeHtml(orderItemsText(o)) + '</td>' +
       '<td>' + orderQty(o) + '</td>' +
       '<td>' + escapeHtml(o.logistics) + '</td>' +
-      '<td>$' + o.amount.toLocaleString() + '</td>' +
+      amountCell +
+      actionCell +
       '</tr>';
+    tbody.innerHTML += tr;
   });
+
+  renderIssueSummary(counts, pendingIssueOrders);
+  bindReviewActions(orders);
+}
+
+// ===== 頂部彙總警示條（B） =====
+function renderIssueSummary(counts, pendingIssueOrders) {
+  var el = document.getElementById('issue-summary');
+  if (!el) return;
+
+  if (pendingIssueOrders === 0) {
+    el.className = 'issue-summary ok';
+    el.textContent = '✓ 未發現異常，或所有異常皆已確認無誤。';
+    return;
+  }
+
+  var parts = [];
+  if (counts['future-date'] > 0) parts.push('未來日期 ' + counts['future-date'] + ' 筆');
+  if (counts['zero-amount'] > 0) parts.push('金額為 0 ' + counts['zero-amount'] + ' 筆');
+  if (counts['duplicate-id'] > 0) parts.push('重複訂單號 ' + counts['duplicate-id'] + ' 筆');
+
+  el.className = 'issue-summary warn';
+  el.textContent = '⚠ 發現 ' + pendingIssueOrders + ' 筆訂單有異常（' + parts.join('、') +
+    '）。請逐筆確認：確認無誤或直接修正日期／金額。';
+}
+
+// ===== 逐筆確認與就地編輯事件（C） =====
+function bindReviewActions(orders) {
+  var tbody = document.getElementById('cleaned-table').querySelector('tbody');
+
+  // 確認 / 需檢查 / 還原按鈕
+  tbody.querySelectorAll('.review-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var key = btn.dataset.key;
+      var action = btn.dataset.action;
+      if (action === 'confirm') reviewStatus[key] = 'confirmed';
+      else if (action === 'recheck') reviewStatus[key] = 'recheck';
+      else if (action === 'reset') delete reviewStatus[key];
+      renderCleanedTable(orders);
+    });
+  });
+
+  // 就地編輯：修改回寫到 currentOrders 對應訂單
+  tbody.querySelectorAll('.edit-input').forEach(function(input) {
+    input.addEventListener('change', function() {
+      var key = input.dataset.key;
+      var field = input.dataset.field;
+      // key 形如 "編號#index"，取最後的 index 對回篩選後清單
+      applyEdit(orders, key, field, input.value);
+      renderCleanedTable(orders);
+    });
+  });
+}
+
+// 依 orderKey 找到訂單並套用編輯（在 orders 原陣列上更新，確保匯出/儀表板同步）
+function applyEdit(orders, key, field, value) {
+  var pf = document.getElementById('platform-filter').value;
+  var filtered = pf === 'all' ? orders : orders.filter(function(o) { return o.platform === pf; });
+
+  for (var i = 0; i < filtered.length; i++) {
+    if (orderKey(filtered[i], i) === key) {
+      var target = filtered[i];
+      if (field === 'date') {
+        target.date = normalizeDate(value);
+      } else if (field === 'amount') {
+        target.amount = parseInt(value, 10) || 0;
+      }
+      // 編輯後清除該筆的確認狀態，讓系統重新判定是否仍有異常
+      delete reviewStatus[key];
+      break;
+    }
+  }
 }
 
 // ===== 平台篩選（清洗結果） =====

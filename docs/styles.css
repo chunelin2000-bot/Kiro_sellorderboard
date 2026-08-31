@@ -211,9 +211,122 @@ tbody tr:nth-child(even) {
   background: #fafafa;
 }
 
-/* 重複訂單標示 */
+/* 重複訂單標示（舊）→ 統一改用 issue-row 標示 */
 tr.duplicate {
   background: #fff3cd !important;
+}
+
+/* === 異常警示（清洗結果） === */
+
+/* B. 頂部彙總警示條 */
+.issue-summary {
+  padding: 10px 14px;
+  border-radius: 6px;
+  font-size: 14px;
+  margin-bottom: 12px;
+}
+.issue-summary:empty {
+  display: none;
+}
+.issue-summary.warn {
+  background: #fff4e5;
+  color: #8a5300;
+  border: 1px solid #f0c48a;
+}
+.issue-summary.ok {
+  background: #eef7f1;
+  color: #2e6b4d;
+  border: 1px solid #b6ddc6;
+}
+
+/* A. 異常列標示：整列淡黃底 */
+tbody tr.issue-row,
+tbody tr.issue-row:nth-child(even) {
+  background: #fff8e6;
+}
+
+/* 已確認無誤：整列轉為淡灰，警示解除 */
+tbody tr.confirmed-row,
+tbody tr.confirmed-row:nth-child(even) {
+  background: #f2f4f6;
+  color: #6b7280;
+}
+
+/* A. 異常儲存格：紅字加粗與 ⚠ 圖示 */
+td.cell-issue {
+  color: #c62828;
+  font-weight: bold;
+  background: #ffecec;
+}
+
+/* 就地編輯輸入框 */
+.edit-input {
+  border: 1px solid #e0912b;
+  border-radius: 4px;
+  padding: 3px 6px;
+  font-size: 13px;
+  color: #333;
+  font-weight: normal;
+}
+.edit-input:focus {
+  outline: none;
+  border-color: #4a90d9;
+  box-shadow: 0 0 0 2px rgba(74,144,217,0.2);
+}
+.edit-amount {
+  width: 90px;
+}
+
+/* C. 處理狀態欄 */
+.review-cell {
+  white-space: nowrap;
+}
+.review-btn {
+  padding: 4px 10px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+  margin-right: 4px;
+}
+.review-confirm {
+  background: #2e9e6b;
+  color: #fff;
+}
+.review-confirm:hover {
+  background: #268159;
+}
+.review-recheck {
+  background: #fff;
+  color: #c0392b;
+  border: 1px solid #e0a0a0;
+}
+.review-recheck:hover,
+.review-recheck.active {
+  background: #fdecec;
+}
+.review-reset {
+  background: #fff;
+  color: #555;
+  border: 1px solid #bbb;
+}
+.review-reset:hover {
+  background: #f2f2f2;
+}
+.review-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 12px;
+  margin-right: 6px;
+}
+.review-badge.confirmed {
+  background: #e3efe8;
+  color: #2e6b4d;
+}
+.review-ok {
+  color: #999;
+  font-size: 13px;
 }
 
 /* === 動作按鈕列 === */

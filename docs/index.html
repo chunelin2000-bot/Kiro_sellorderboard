@@ -49,6 +49,8 @@
 
     <!-- 清洗結果 -->
     <h3>清洗結果</h3>
+    <!-- 異常彙總警示條 -->
+    <div id="issue-summary" class="issue-summary" role="status" aria-live="polite"></div>
     <div class="filter-row">
       <label for="platform-filter">篩選平台：</label>
       <select id="platform-filter">
@@ -71,6 +73,7 @@
             <th>總數量</th>
             <th>物流方式</th>
             <th>訂單金額</th>
+            <th>處理狀態</th>
           </tr>
         </thead>
         <tbody></tbody>
