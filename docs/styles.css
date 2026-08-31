@@ -230,41 +230,37 @@ tr.duplicate {
   margin-bottom: 16px;
 }
 
-.doc-block {
-  border: 1px solid #ddd;
-  border-left-width: 5px;
-  border-radius: 8px;
-  padding: 16px;
-  margin-bottom: 20px;
-  background: #fff;
-}
-
-/* 出貨單：藍色系 */
-.doc-shipping {
-  border-left-color: #4a90d9;
-}
-
-/* 揀貨單：琥珀色系 */
-.doc-picking {
-  border-left-color: #e0912b;
-}
-
-.doc-block-header {
+/* 操作列：固定於頂部，單據類型下拉 + 產生 + 列印 */
+.doc-toolbar {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
+  align-items: flex-end;
   flex-wrap: wrap;
   gap: 12px;
-  margin-bottom: 12px;
+  padding: 12px 16px;
+  margin-bottom: 16px;
+  background: #f7f7f7;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
 }
 
-.doc-block-header h3 {
-  margin: 0;
-}
-
-.doc-actions {
+.doc-toolbar .filter-group {
   display: flex;
-  gap: 8px;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.doc-toolbar label {
+  font-size: 12px;
+  color: #666;
+}
+
+.doc-toolbar select {
+  padding: 8px 12px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 14px;
+  background: #fff;
+  min-width: 140px;
 }
 
 .doc-btn {
@@ -518,7 +514,7 @@ tr.duplicate {
   .filter-row,
   .error-msg,
   .print-hint,
-  .doc-actions,
+  .doc-toolbar,
   #tab-import,
   #tab-dashboard {
     display: none !important;
@@ -530,21 +526,9 @@ tr.duplicate {
     padding: 0;
   }
 
-  #tab-print h2,
-  .doc-block-header h3 {
+  #tab-print h2 {
     display: none;
   }
-
-  /* 列印時移除單據區塊外框，僅保留單據內容 */
-  .doc-block {
-    border: none;
-    padding: 0;
-    margin: 0;
-  }
-
-  /* 依 body class 只顯示選定的單據；未指定時預設顯示出貨單 */
-  body.printing-shipping .doc-picking { display: none !important; }
-  body.printing-picking .doc-shipping { display: none !important; }
 
   .shipping-label {
     page-break-after: always;

@@ -81,30 +81,24 @@
   <!-- Tab 2：出貨列印 -->
   <section id="tab-print" class="tab-content">
     <h2>出貨列印</h2>
-    <p class="print-hint">請選擇要處理的單據類型。出貨單為每筆訂單一張的寄件明細；揀貨單為依商品彙總的備貨清單。</p>
+    <p class="print-hint">選擇單據類型後點「產生」，同一區域只會顯示所選單據，確認無誤即可列印。出貨單為每筆訂單一張的寄件明細；揀貨單為依商品彙總的備貨清單。</p>
 
-    <!-- 出貨單區塊 -->
-    <div class="doc-block doc-shipping">
-      <div class="doc-block-header">
-        <h3>出貨單</h3>
-        <div class="doc-actions">
-          <button id="btn-shipping" class="doc-btn doc-btn-shipping">產生出貨單</button>
-          <button id="btn-print-shipping" class="doc-btn doc-btn-outline" disabled>列印出貨單</button>
-        </div>
+    <!-- 操作列（固定於頂部） -->
+    <div class="doc-toolbar">
+      <div class="filter-group">
+        <label for="doc-type">單據類型</label>
+        <select id="doc-type">
+          <option value="shipping">出貨單</option>
+          <option value="picking">揀貨單</option>
+        </select>
       </div>
-      <div id="shipping-area" class="print-area"></div>
+      <button id="btn-generate" class="doc-btn doc-btn-shipping">產生</button>
+      <button id="btn-print-doc" class="doc-btn doc-btn-outline" disabled>列印</button>
     </div>
 
-    <!-- 揀貨單區塊 -->
-    <div class="doc-block doc-picking">
-      <div class="doc-block-header">
-        <h3>揀貨單</h3>
-        <div class="doc-actions">
-          <button id="btn-picking" class="doc-btn doc-btn-picking">產生揀貨單</button>
-          <button id="btn-print-picking" class="doc-btn doc-btn-outline" disabled>列印揀貨單</button>
-        </div>
-      </div>
-      <div id="picking-area" class="print-area"></div>
+    <!-- 共用顯示區 -->
+    <div id="doc-area" class="print-area">
+      <p class="doc-empty">請選擇單據類型並點「產生」。</p>
     </div>
   </section>
 
