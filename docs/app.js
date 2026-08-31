@@ -46,8 +46,6 @@ var mockCyberbiz = [
   { orderId: "#1224", platform: "CYBERBIZ", date: "2024-03-27", recipient: "賴思穎", phone: "0900-111-224", address: "台南市中西區府前路一段150號", logistics: "順豐物流配送", amount: 780, items: [{ product: "陶瓷手沖咖啡杯", quantity: 1 }] }
 ];
 
-var allOrders = mockPinkoi.concat(mockCyberbiz);
-
 // ===== HTML 跳脫（防 XSS） =====
 function escapeHtml(str) {
   return String(str)
@@ -1076,9 +1074,9 @@ function drawComboChart(svgId, items) {
 }
 
 // ===== 時間範圍篩選 =====
-// 儀表板資料來源：已載入訂單則用 currentOrders，否則用內建模擬資料
+// 儀表板資料來源：只反映實際載入的訂單，未載入時為空（不再 fallback 範例資料）
 function dashboardSource() {
-  var src = (currentOrders && currentOrders.length > 0) ? currentOrders : allOrders;
+  var src = currentOrders || [];
   ensureOrderUids(src);  // 確保來源資料皆有穩定 _uid
   return src;
 }
@@ -1236,7 +1234,7 @@ function updateSyncStatus(source) {
     el.textContent = '✓ 已與訂單同步：共 ' + source.length + ' 筆訂單（' + time + '）';
   } else {
     el.className = 'sync-status demo';
-    el.textContent = '目前顯示內建範例資料（尚未載入訂單）。請至「訂單匯入」上傳，或點「與訂單同步」。';
+    el.textContent = '尚無訂單資料。請至「訂單匯入」上傳或載入範例，再回此頁查看銷售分析。';
   }
 }
 
