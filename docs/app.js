@@ -127,42 +127,68 @@ fileInput.addEventListener('change', function() {
   fileInput.value = '';  // 清空以便重複選取同一檔案
 });
 
-// 讀取多個檔案（逐一讀取，全部完成後合併）
+// 讀取多個檔案（支援 .csv 與 .xlsx，全部完成後合併）
 function handleFiles(fileList) {
   uploadError.hidden = true;
   var files = Array.prototype.slice.call(fileList);
-  var csvFiles = files.filter(function(f) { return f.name.toLowerCase().endsWith('.csv'); });
+  var supported = files.filter(function(f) {
+    var n = f.name.toLowerCase();
+    return n.endsWith('.csv') || n.endsWith('.xlsx');
+  });
 
-  if (csvFiles.length === 0) {
-    uploadError.textContent = '錯誤：請選擇 CSV 格式的檔案';
+  if (supported.length === 0) {
+    uploadError.textContent = '錯誤：請選擇 CSV 或 Excel（.xlsx）格式的檔案';
     uploadError.hidden = false;
     return;
   }
-  if (csvFiles.length < files.length) {
-    uploadError.textContent = '提醒：已略過非 CSV 檔案，僅處理 ' + csvFiles.length + ' 個 CSV。';
+  if (supported.length < files.length) {
+    uploadError.textContent = '提醒：已略過不支援的檔案，僅處理 ' + supported.length + ' 個檔案。';
     uploadError.hidden = false;
   }
 
-  var mergedOrders = [];
-  var readCount = 0;
-  var fileNames = [];
+  // 每個檔案回傳一個 Promise<rows>
+  var tasks = supported.map(function(file) {
+    var isXlsx = file.name.toLowerCase().endsWith('.xlsx');
+    return readFileRows(file, isXlsx).then(function(rows) {
+      return { name: file.name, rows: rows };
+    }).catch(function(err) {
+      return { name: file.name, rows: [], error: err };
+    });
+  });
 
-  csvFiles.forEach(function(file) {
-    var reader = new FileReader();
-    reader.onload = function(e) {
-      var text = decodeBuffer(e.target.result);
-      var rows = parseCSV(text);
-      if (rows.length >= 2) {
-        var cleaned = cleanOrders(rows);
-        mergedOrders = mergedOrders.concat(cleaned);
-        fileNames.push(file.name);
+  Promise.all(tasks).then(function(results) {
+    var mergedOrders = [];
+    var fileNames = [];
+    var failed = [];
+    results.forEach(function(r) {
+      if (r.rows && r.rows.length >= 2) {
+        mergedOrders = mergedOrders.concat(cleanOrders(r.rows));
+        fileNames.push(r.name);
+      } else {
+        failed.push(r.name);
       }
-      readCount++;
-      if (readCount === csvFiles.length) {
-        finishImport(mergedOrders, fileNames);
+    });
+    if (failed.length > 0) {
+      uploadError.textContent = '以下檔案無法解析或無資料：' + failed.join('、');
+      uploadError.hidden = false;
+    }
+    finishImport(mergedOrders, fileNames);
+  });
+}
+
+// 依副檔名讀取檔案並回傳 rows 陣列的 Promise
+function readFileRows(file, isXlsx) {
+  return new Promise(function(resolve, reject) {
+    var reader = new FileReader();
+    reader.onerror = function() { reject(new Error('讀取失敗')); };
+    reader.onload = function(e) {
+      if (isXlsx) {
+        parseXlsx(e.target.result).then(resolve).catch(reject);
+      } else {
+        var text = decodeBuffer(e.target.result);
+        resolve(parseCSV(text));
       }
     };
-    // 以 ArrayBuffer 讀取，才能依 BOM 判斷編碼（Pinkoi 匯出常為 UTF-16）
     reader.readAsArrayBuffer(file);
   });
 }
@@ -256,6 +282,162 @@ function parseCSV(text) {
   }).map(function(r) {
     return r.map(function(c) { return String(c).trim(); });
   });
+}
+
+// ===== XLSX 解析（不使用外部套件，靠瀏覽器內建 DecompressionStream 解 ZIP） =====
+
+// 解析 xlsx（ArrayBuffer）→ 回傳 rows 陣列的 Promise
+function parseXlsx(arrayBuffer) {
+  var bytes = new Uint8Array(arrayBuffer);
+  var entries = readZipEntries(bytes);
+
+  // 需要的檔案：工作表與（若有）sharedStrings
+  var sheetEntry = entries['xl/worksheets/sheet1.xml'];
+  var sharedEntry = entries['xl/sharedStrings.xml'];
+  if (!sheetEntry) {
+    return Promise.reject(new Error('找不到工作表 sheet1.xml'));
+  }
+
+  var jobs = [inflateEntry(sheetEntry)];
+  if (sharedEntry) jobs.push(inflateEntry(sharedEntry));
+
+  return Promise.all(jobs).then(function(texts) {
+    var sheetXml = texts[0];
+    var sharedStrings = texts[1] ? parseSharedStrings(texts[1]) : [];
+    return parseSheetXml(sheetXml, sharedStrings);
+  });
+}
+
+// 讀取 ZIP 的中央目錄（比 local header 可靠，能正確取得壓縮大小；
+// 部分匯出工具使用 data descriptor 導致 local header 的大小為 0）
+function readZipEntries(bytes) {
+  var view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  var decoder = new TextDecoder('utf-8');
+  var entries = {};
+
+  // 1. 從檔尾往前找 End of Central Directory (EOCD) 簽名 0x06054b50
+  var eocd = -1;
+  for (var p = bytes.length - 22; p >= 0; p--) {
+    if (view.getUint32(p, true) === 0x06054b50) { eocd = p; break; }
+  }
+  if (eocd < 0) return entries;
+
+  var cdOffset = view.getUint32(eocd + 16, true);  // 中央目錄起始位移
+  var cdCount = view.getUint16(eocd + 10, true);   // 條目數
+
+  var pos = cdOffset;
+  for (var n = 0; n < cdCount; n++) {
+    if (view.getUint32(pos, true) !== 0x02014b50) break;  // central directory header 簽名
+    var method = view.getUint16(pos + 10, true);
+    var compSize = view.getUint32(pos + 20, true);
+    var nameLen = view.getUint16(pos + 28, true);
+    var extraLen = view.getUint16(pos + 30, true);
+    var commentLen = view.getUint16(pos + 32, true);
+    var localOffset = view.getUint32(pos + 42, true);
+    var name = decoder.decode(bytes.subarray(pos + 46, pos + 46 + nameLen));
+
+    // 2. 從 local file header 算出實際資料起點（名稱/extra 長度以 local header 為準）
+    if (view.getUint32(localOffset, true) === 0x04034b50) {
+      var lNameLen = view.getUint16(localOffset + 26, true);
+      var lExtraLen = view.getUint16(localOffset + 28, true);
+      var dataStart = localOffset + 30 + lNameLen + lExtraLen;
+      var compData = bytes.subarray(dataStart, dataStart + compSize);
+      entries[name] = { method: method, data: compData };
+    }
+
+    pos += 46 + nameLen + extraLen + commentLen;
+  }
+  return entries;
+}
+
+// 解壓單一 ZIP 條目 → 回傳文字的 Promise（method 0=未壓縮, 8=deflate）
+function inflateEntry(entry) {
+  if (entry.method === 0) {
+    return Promise.resolve(new TextDecoder('utf-8').decode(entry.data));
+  }
+  // method 8 = deflate（ZIP 內為 raw deflate）
+  if (typeof DecompressionStream === 'undefined') {
+    return Promise.reject(new Error('瀏覽器不支援解壓 xlsx，請改用 CSV'));
+  }
+  var ds = new DecompressionStream('deflate-raw');
+  var blob = new Blob([entry.data]);
+  var stream = blob.stream().pipeThrough(ds);
+  return new Response(stream).arrayBuffer().then(function(buf) {
+    return new TextDecoder('utf-8').decode(new Uint8Array(buf));
+  });
+}
+
+// 解析 sharedStrings.xml → 字串陣列
+function parseSharedStrings(xml) {
+  var doc = new DOMParser().parseFromString(xml, 'application/xml');
+  var siList = doc.getElementsByTagName('si');
+  var result = [];
+  for (var i = 0; i < siList.length; i++) {
+    // 一個 <si> 可能含多個 <t>（rich text），全部串接
+    var tList = siList[i].getElementsByTagName('t');
+    var s = '';
+    for (var j = 0; j < tList.length; j++) { s += tList[j].textContent; }
+    result.push(s);
+  }
+  return result;
+}
+
+// 解析 sheet1.xml → rows 陣列（依欄位字母排序，缺格補空）
+function parseSheetXml(xml, sharedStrings) {
+  var doc = new DOMParser().parseFromString(xml, 'application/xml');
+  var rowList = doc.getElementsByTagName('row');
+  var rows = [];
+
+  for (var r = 0; r < rowList.length; r++) {
+    var cellList = rowList[r].getElementsByTagName('c');
+    var cellMap = {};
+    var maxCol = 0;
+
+    for (var c = 0; c < cellList.length; c++) {
+      var cell = cellList[c];
+      var ref = cell.getAttribute('r') || '';
+      var colIdx = colRefToIndex(ref);
+      var type = cell.getAttribute('t');
+      var value = '';
+
+      if (type === 'inlineStr') {
+        var isEl = cell.getElementsByTagName('t');
+        for (var k = 0; k < isEl.length; k++) { value += isEl[k].textContent; }
+      } else if (type === 's') {
+        // shared string：<v> 是索引
+        var vs = cell.getElementsByTagName('v')[0];
+        var idx = vs ? parseInt(vs.textContent, 10) : -1;
+        value = (idx >= 0 && idx < sharedStrings.length) ? sharedStrings[idx] : '';
+      } else {
+        var v = cell.getElementsByTagName('v')[0];
+        value = v ? v.textContent : '';
+      }
+
+      cellMap[colIdx] = value;
+      if (colIdx > maxCol) maxCol = colIdx;
+    }
+
+    var rowArr = [];
+    for (var col = 0; col <= maxCol; col++) {
+      rowArr.push(cellMap[col] !== undefined ? String(cellMap[col]).trim() : '');
+    }
+    rows.push(rowArr);
+  }
+
+  // 移除全空列
+  return rows.filter(function(rw) {
+    return rw.some(function(cc) { return cc !== ''; });
+  });
+}
+
+// 儲存格參照（如 "AB12"）→ 欄索引（0-based）
+function colRefToIndex(ref) {
+  var letters = (ref.match(/[A-Z]+/) || [''])[0];
+  var idx = 0;
+  for (var i = 0; i < letters.length; i++) {
+    idx = idx * 26 + (letters.charCodeAt(i) - 64);
+  }
+  return idx - 1;
 }
 
 // ===== 載入範例 =====
