@@ -92,20 +92,35 @@ var btnUpload = document.getElementById('btn-upload');
 btnUpload.addEventListener('click', function() { fileInput.click(); });
 uploadArea.addEventListener('click', function() { fileInput.click(); });
 
-uploadArea.addEventListener('dragover', function(e) {
+// 拖曳：需在 dragenter 與 dragover 都 preventDefault，瀏覽器才允許 drop
+uploadArea.addEventListener('dragenter', function(e) {
   e.preventDefault();
+  e.stopPropagation();
   uploadArea.classList.add('dragover');
 });
 
-uploadArea.addEventListener('dragleave', function() {
+uploadArea.addEventListener('dragover', function(e) {
+  e.preventDefault();
+  e.stopPropagation();
+  uploadArea.classList.add('dragover');
+});
+
+uploadArea.addEventListener('dragleave', function(e) {
+  e.preventDefault();
+  e.stopPropagation();
   uploadArea.classList.remove('dragover');
 });
 
 uploadArea.addEventListener('drop', function(e) {
   e.preventDefault();
+  e.stopPropagation();
   uploadArea.classList.remove('dragover');
-  if (e.dataTransfer.files.length > 0) handleFiles(e.dataTransfer.files);
+  if (e.dataTransfer && e.dataTransfer.files.length > 0) handleFiles(e.dataTransfer.files);
 });
+
+// 防止瀏覽器在整頁其他位置放開檔案時直接開啟檔案
+window.addEventListener('dragover', function(e) { e.preventDefault(); });
+window.addEventListener('drop', function(e) { e.preventDefault(); });
 
 fileInput.addEventListener('change', function() {
   if (fileInput.files.length > 0) handleFiles(fileInput.files);
@@ -135,7 +150,8 @@ function handleFiles(fileList) {
   csvFiles.forEach(function(file) {
     var reader = new FileReader();
     reader.onload = function(e) {
-      var rows = parseCSV(e.target.result);
+      var text = decodeBuffer(e.target.result);
+      var rows = parseCSV(text);
       if (rows.length >= 2) {
         var cleaned = cleanOrders(rows);
         mergedOrders = mergedOrders.concat(cleaned);
@@ -146,8 +162,26 @@ function handleFiles(fileList) {
         finishImport(mergedOrders, fileNames);
       }
     };
-    reader.readAsText(file);
+    // 以 ArrayBuffer 讀取，才能依 BOM 判斷編碼（Pinkoi 匯出常為 UTF-16）
+    reader.readAsArrayBuffer(file);
   });
+}
+
+// 依 BOM 自動偵測編碼並解碼為文字（支援 UTF-16 LE/BE、UTF-8）
+function decodeBuffer(buffer) {
+  var bytes = new Uint8Array(buffer);
+  var encoding = 'utf-8';
+  if (bytes.length >= 2 && bytes[0] === 0xFF && bytes[1] === 0xFE) {
+    encoding = 'utf-16le';
+  } else if (bytes.length >= 2 && bytes[0] === 0xFE && bytes[1] === 0xFF) {
+    encoding = 'utf-16be';
+  }
+  try {
+    return new TextDecoder(encoding).decode(bytes);
+  } catch (err) {
+    // 少數環境不支援某編碼時，退回 UTF-8
+    return new TextDecoder('utf-8').decode(bytes);
+  }
 }
 
 // 全部檔案讀完後，統一以表格呈現預覽與清洗結果
@@ -169,10 +203,19 @@ function finishImport(orders, fileNames) {
   renderCleanedTable(orders);
 }
 
-// 標準 CSV 解析：支援雙引號包裹、欄位內逗號、跳脫雙引號 ("")、CRLF
+// 偵測分隔符：比較第一行的 Tab 與逗號數量，多者為分隔符（Pinkoi 匯出常為 Tab 分隔）
+function detectDelimiter(text) {
+  var firstLine = text.split('\n')[0] || '';
+  var tabCount = (firstLine.match(/\t/g) || []).length;
+  var commaCount = (firstLine.match(/,/g) || []).length;
+  return tabCount > commaCount ? '\t' : ',';
+}
+
+// 標準 CSV/TSV 解析：自動偵測分隔符，支援雙引號包裹、欄位內分隔符、跳脫雙引號 ("")、CRLF
 function parseCSV(text) {
   // 移除 BOM
   if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
+  var delimiter = detectDelimiter(text);
   var rows = [];
   var row = [];
   var field = '';
@@ -190,7 +233,7 @@ function parseCSV(text) {
     } else {
       if (ch === '"') {
         inQuotes = true;
-      } else if (ch === ',') {
+      } else if (ch === delimiter) {
         row.push(field); field = '';
       } else if (ch === '\n') {
         row.push(field); field = '';
