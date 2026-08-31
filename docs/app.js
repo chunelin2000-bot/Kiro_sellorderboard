@@ -85,6 +85,11 @@ var uploadArea = document.getElementById('upload-area');
 var fileInput = document.getElementById('file-input');
 var uploadError = document.getElementById('upload-error');
 
+var importStatus = document.getElementById('import-status');
+var btnUpload = document.getElementById('btn-upload');
+
+// 點「上傳訂單檔案」按鈕或點拖曳區，皆開啟檔案選取
+btnUpload.addEventListener('click', function() { fileInput.click(); });
 uploadArea.addEventListener('click', function() { fileInput.click(); });
 
 uploadArea.addEventListener('dragover', function(e) {
@@ -99,40 +104,114 @@ uploadArea.addEventListener('dragleave', function() {
 uploadArea.addEventListener('drop', function(e) {
   e.preventDefault();
   uploadArea.classList.remove('dragover');
-  if (e.dataTransfer.files.length > 0) handleFile(e.dataTransfer.files[0]);
+  if (e.dataTransfer.files.length > 0) handleFiles(e.dataTransfer.files);
 });
 
 fileInput.addEventListener('change', function() {
-  if (fileInput.files.length > 0) handleFile(fileInput.files[0]);
+  if (fileInput.files.length > 0) handleFiles(fileInput.files);
+  fileInput.value = '';  // 清空以便重複選取同一檔案
 });
 
-function handleFile(file) {
+// 讀取多個檔案（逐一讀取，全部完成後合併）
+function handleFiles(fileList) {
   uploadError.hidden = true;
-  if (!file.name.toLowerCase().endsWith('.csv')) {
+  var files = Array.prototype.slice.call(fileList);
+  var csvFiles = files.filter(function(f) { return f.name.toLowerCase().endsWith('.csv'); });
+
+  if (csvFiles.length === 0) {
     uploadError.textContent = '錯誤：請選擇 CSV 格式的檔案';
     uploadError.hidden = false;
     return;
   }
-  var reader = new FileReader();
-  reader.onload = function(e) {
-    var rows = parseCSV(e.target.result);
-    if (rows.length < 2) {
-      uploadError.textContent = '錯誤：檔案無資料';
-      uploadError.hidden = false;
-      return;
-    }
-    renderPreview(rows);
-    var cleaned = cleanOrders(rows);
-    currentOrders = cleaned;
-    renderCleanedTable(cleaned);
-  };
-  reader.readAsText(file);
+  if (csvFiles.length < files.length) {
+    uploadError.textContent = '提醒：已略過非 CSV 檔案，僅處理 ' + csvFiles.length + ' 個 CSV。';
+    uploadError.hidden = false;
+  }
+
+  var mergedOrders = [];
+  var readCount = 0;
+  var fileNames = [];
+
+  csvFiles.forEach(function(file) {
+    var reader = new FileReader();
+    reader.onload = function(e) {
+      var rows = parseCSV(e.target.result);
+      if (rows.length >= 2) {
+        var cleaned = cleanOrders(rows);
+        mergedOrders = mergedOrders.concat(cleaned);
+        fileNames.push(file.name);
+      }
+      readCount++;
+      if (readCount === csvFiles.length) {
+        finishImport(mergedOrders, fileNames);
+      }
+    };
+    reader.readAsText(file);
+  });
 }
 
+// 全部檔案讀完後，統一以表格呈現預覽與清洗結果
+function finishImport(orders, fileNames) {
+  if (orders.length === 0) {
+    uploadError.textContent = '錯誤：檔案無有效訂單資料';
+    uploadError.hidden = false;
+    importStatus.hidden = true;
+    return;
+  }
+  currentOrders = orders;
+  // 狀態列：顯示檔案數與訂單數
+  importStatus.hidden = false;
+  importStatus.textContent = '已載入 ' + fileNames.length + ' 個檔案，共 ' + orders.length +
+    ' 筆訂單' + (orders.length > 5 ? '（預覽顯示前 5 筆）' : '') + '。';
+  // 原始預覽（表格，顯示前 5 筆清洗後訂單）
+  renderPreviewFromOrders(orders.slice(0, 5));
+  // 清洗結果（全部）
+  renderCleanedTable(orders);
+}
+
+// 標準 CSV 解析：支援雙引號包裹、欄位內逗號、跳脫雙引號 ("")、CRLF
 function parseCSV(text) {
-  var lines = text.trim().split('\n');
-  return lines.map(function(line) {
-    return line.split(',').map(function(cell) { return cell.trim().replace(/^"|"$/g, ''); });
+  // 移除 BOM
+  if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
+  var rows = [];
+  var row = [];
+  var field = '';
+  var inQuotes = false;
+
+  for (var i = 0; i < text.length; i++) {
+    var ch = text[i];
+    if (inQuotes) {
+      if (ch === '"') {
+        if (text[i + 1] === '"') { field += '"'; i++; }  // 跳脫的雙引號
+        else { inQuotes = false; }                        // 結束引號
+      } else {
+        field += ch;
+      }
+    } else {
+      if (ch === '"') {
+        inQuotes = true;
+      } else if (ch === ',') {
+        row.push(field); field = '';
+      } else if (ch === '\n') {
+        row.push(field); field = '';
+        rows.push(row); row = [];
+      } else if (ch === '\r') {
+        // 忽略，交由 \n 處理換行
+      } else {
+        field += ch;
+      }
+    }
+  }
+  // 收尾最後一個欄位/列
+  if (field !== '' || row.length > 0) {
+    row.push(field);
+    rows.push(row);
+  }
+  // 移除全空的列
+  return rows.filter(function(r) {
+    return r.some(function(c) { return String(c).trim() !== ''; });
+  }).map(function(r) {
+    return r.map(function(c) { return String(c).trim(); });
   });
 }
 
@@ -147,60 +226,83 @@ document.getElementById('btn-cyberbiz').addEventListener('click', function() {
 
 function loadExample(data) {
   uploadError.hidden = true;
-  // 預覽：把 items 展開成原始多列樣貌（一單多商品 → 多列），前 5 列
-  var headers = ['訂單編號', '平台', '日期', '收件人', '電話', '地址', '商品', '數量', '物流', '金額'];
-  var rows = [headers];
-  data.forEach(function(o) {
-    o.items.forEach(function(it, idx) {
-      if (idx === 0) {
-        rows.push([o.orderId, o.platform, o.date, o.recipient, o.phone, o.address, it.product, it.quantity, o.logistics, o.amount]);
-      } else {
-        // 明細列：僅商品與數量（模擬 CYBERBIZ 一單多列）
-        rows.push([o.orderId, '', '', '', '', '', it.product, it.quantity, '', '']);
-      }
-    });
-  });
-  renderPreviewFromArray(rows.slice(0, 6));
   currentOrders = data;
+  importStatus.hidden = false;
+  importStatus.textContent = '已載入範例，共 ' + data.length + ' 筆訂單' +
+    (data.length > 5 ? '（預覽顯示前 5 筆）' : '') + '。';
+  renderPreviewFromOrders(data.slice(0, 5));
   renderCleanedTable(data);
 }
 
-// ===== 原始預覽（表格式） =====
-function renderPreview(rows) {
-  renderPreviewFromArray([rows[0]].concat(rows.slice(1, 6)));
-}
+// ===== 原始預覽（表格式，統一訂單格式） =====
+var PREVIEW_HEADERS = ['訂單編號', '平台', '日期', '收件人', '電話', '地址', '商品明細', '總數量', '物流方式', '訂單金額'];
 
-function renderPreviewFromArray(rows) {
+function renderPreviewFromOrders(orders) {
   var table = document.getElementById('preview-table');
   var thead = table.querySelector('thead');
   var tbody = table.querySelector('tbody');
-  thead.innerHTML = '<tr>' + rows[0].map(function(h) { return '<th>' + escapeHtml(h) + '</th>'; }).join('') + '</tr>';
+  thead.innerHTML = '<tr>' + PREVIEW_HEADERS.map(function(h) { return '<th>' + escapeHtml(h) + '</th>'; }).join('') + '</tr>';
   tbody.innerHTML = '';
-  rows.slice(1).forEach(function(row) {
-    tbody.innerHTML += '<tr>' + row.map(function(c) { return '<td>' + escapeHtml(c) + '</td>'; }).join('') + '</tr>';
+  orders.forEach(function(o) {
+    tbody.innerHTML += '<tr>' +
+      '<td>' + escapeHtml(o.orderId) + '</td>' +
+      '<td>' + escapeHtml(o.platform) + '</td>' +
+      '<td>' + escapeHtml(o.date) + '</td>' +
+      '<td>' + escapeHtml(o.recipient) + '</td>' +
+      '<td>' + escapeHtml(o.phone) + '</td>' +
+      '<td>' + escapeHtml(o.address) + '</td>' +
+      '<td>' + escapeHtml(orderItemsText(o)) + '</td>' +
+      '<td>' + orderQty(o) + '</td>' +
+      '<td>' + escapeHtml(o.logistics) + '</td>' +
+      '<td>$' + o.amount.toLocaleString() + '</td>' +
+      '</tr>';
   });
+}
+
+// ===== 欄位別名對照表（涵蓋 Pinkoi 與 CYBERBIZ 真實匯出欄位名） =====
+var FIELD_ALIASES = {
+  orderId:   ['訂單編號', 'orderid', 'order_id'],
+  date:      ['訂單成立日期', '訂購日期', '訂單日期', '時間', '日期', 'date', 'order_date'],
+  recipient: ['收件人姓名', '收件人名稱', '收件人', 'recipient', 'name'],
+  phone:     ['收件人電話', '聯絡電話', '電話', 'phone', 'tel'],
+  address:   ['收件人地址', '收件地址', '地址', 'address'],
+  product:   ['商品名稱', '商品名稱 / 規格', '購買品項', '商品', 'product', 'item'],
+  style:     ['商品款式', '商品規格', '款式', 'sku'],
+  quantity:  ['數量', 'quantity', 'qty'],
+  logistics: ['運送方式', '出貨方式', '寄送方式', '配送方式', '物流', 'logistics', 'shipping'],
+  amount:    ['總額', '訂單總金額', '總金額', '金額', 'amount', 'total']
+};
+
+// 從一列物件中依別名取值（別名皆已小寫化比對）
+function pick(obj, key) {
+  var aliases = FIELD_ALIASES[key];
+  for (var i = 0; i < aliases.length; i++) {
+    var a = aliases[i].toLowerCase();
+    if (obj[a] !== undefined && obj[a] !== '') return obj[a];
+  }
+  return '';
 }
 
 // ===== 欄位對照 + 一單多列向下填補（fill-down） =====
 function cleanOrders(rows) {
-  var headers = rows[0].map(function(h) { return h.toLowerCase().trim(); });
+  var headers = rows[0].map(function(h) { return String(h).toLowerCase().trim(); });
   var orders = [];
   var lastOrder = null;
 
   for (var i = 1; i < rows.length; i++) {
     var row = rows[i];
-    if (row.length < 3) continue;
+    if (row.length < 2) continue;
     var obj = {};
     headers.forEach(function(h, idx) { obj[h] = (row[idx] || '').trim(); });
 
-    var orderId = obj['訂單編號'] || obj['orderid'] || obj['order_id'] || row[0] || '';
-    var recipient = obj['收件人'] || obj['收件人姓名'] || obj['收件人名稱'] || obj['recipient'] || obj['name'] || row[3] || '';
-    var product = obj['商品'] || obj['商品名稱'] || obj['商品名稱 / 規格'] || obj['product'] || obj['item'] || row[6] || '';
-    var style = obj['商品款式'] || obj['款式'] || '';
-    var qty = parseInt(obj['數量'] || obj['quantity'] || obj['qty'] || row[7], 10) || 1;
+    var orderId = pick(obj, 'orderId');
+    var recipient = pick(obj, 'recipient');
+    var product = pick(obj, 'product');
+    var style = pick(obj, 'style');
+    var qty = parseInt(pick(obj, 'quantity'), 10) || 1;
     var fullProduct = style ? (product + ' - ' + style) : product;
 
-    // 判斷是否為明細列：訂單編號與上一筆相同且收件人為空 → 追加到上一筆
+    // 判斷是否為明細列：訂單編號與上一筆相同（或空）且收件人為空 → 追加到上一筆
     var isDetailRow = lastOrder && (recipient === '') && (orderId === '' || orderId === lastOrder.orderId);
 
     if (isDetailRow) {
@@ -208,17 +310,17 @@ function cleanOrders(rows) {
       continue;
     }
 
-    // 主列：建立新訂單
+    // 主列：建立新訂單。平台以訂單編號 # 前綴判斷
     var platform = String(orderId).indexOf('#') === 0 ? 'CYBERBIZ' : 'Pinkoi';
     var order = {
       orderId: orderId,
       platform: platform,
-      date: normalizeDate(obj['日期'] || obj['訂購日期'] || obj['訂單日期'] || obj['時間'] || obj['date'] || obj['order_date'] || row[2] || ''),
+      date: normalizeDate(pick(obj, 'date')),
       recipient: recipient,
-      phone: obj['電話'] || obj['收件人電話'] || obj['聯絡電話'] || obj['phone'] || obj['tel'] || row[4] || '',
-      address: obj['地址'] || obj['收件人地址'] || obj['收件地址'] || obj['address'] || row[5] || '',
-      logistics: obj['物流'] || obj['寄送方式'] || obj['配送方式'] || obj['出貨方式'] || obj['logistics'] || obj['shipping'] || row[8] || '',
-      amount: parseInt(obj['金額'] || obj['總金額'] || obj['訂單總金額'] || obj['總額'] || obj['amount'] || obj['total'] || row[9], 10) || 0,
+      phone: pick(obj, 'phone'),
+      address: pick(obj, 'address'),
+      logistics: pick(obj, 'logistics'),
+      amount: parseInt(pick(obj, 'amount'), 10) || 0,
       items: fullProduct ? [{ product: fullProduct, quantity: qty }] : []
     };
     orders.push(order);

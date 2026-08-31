@@ -16,6 +16,46 @@ body {
 h2 { margin-bottom: 16px; }
 h3 { margin: 20px 0 8px; }
 
+/* === 區塊標題列（標題 + 動作按鈕） === */
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.section-header h2 {
+  margin-bottom: 0;
+}
+
+.primary-btn {
+  padding: 10px 18px;
+  border: none;
+  background: #2e9e6b;
+  color: #fff;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 15px;
+  font-weight: bold;
+}
+
+.primary-btn:hover {
+  background: #268159;
+}
+
+/* === 匯入狀態列 === */
+.import-status {
+  background: #eef7f1;
+  border: 1px solid #b6ddc6;
+  color: #2e6b4d;
+  padding: 8px 12px;
+  border-radius: 6px;
+  margin-bottom: 12px;
+  font-size: 14px;
+}
+
 /* === Tab 導覽列 === */
 .tab-nav {
   display: flex;
@@ -415,6 +455,15 @@ tr.duplicate {
   }
 
   .filter-group select {
+    width: 100%;
+  }
+
+  .section-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .primary-btn {
     width: 100%;
   }
 

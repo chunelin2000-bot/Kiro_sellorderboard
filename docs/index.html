@@ -17,12 +17,16 @@
 
   <!-- Tab 1：訂單匯入 -->
   <section id="tab-import" class="tab-content active">
-    <h2>訂單匯入</h2>
+    <!-- 標題列：標題 + 上傳按鈕 -->
+    <div class="section-header">
+      <h2>訂單匯入</h2>
+      <button id="btn-upload" class="primary-btn">上傳訂單檔案（可多選）</button>
+    </div>
 
-    <!-- 檔案上傳區 -->
+    <!-- 檔案上傳區（拖曳） -->
     <div class="upload-area" id="upload-area">
-      <p>將 CSV 檔案拖曳至此，或點擊選取檔案</p>
-      <input type="file" id="file-input" accept=".csv">
+      <p>將一個或多個 CSV 檔案拖曳至此，或點擊選取檔案</p>
+      <input type="file" id="file-input" accept=".csv" multiple>
     </div>
     <div id="upload-error" class="error-msg" hidden></div>
 
@@ -34,6 +38,7 @@
 
     <!-- 原始預覽 -->
     <h3>原始資料預覽</h3>
+    <div id="import-status" class="import-status" hidden></div>
     <div class="table-wrapper">
       <table id="preview-table">
         <thead></thead>
