@@ -223,6 +223,104 @@ tr.duplicate {
   margin-bottom: 16px;
 }
 
+/* === 出貨列印：單據區塊（區隔出貨單/揀貨單避免誤按） === */
+.print-hint {
+  color: #666;
+  font-size: 14px;
+  margin-bottom: 16px;
+}
+
+.doc-block {
+  border: 1px solid #ddd;
+  border-left-width: 5px;
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 20px;
+  background: #fff;
+}
+
+/* 出貨單：藍色系 */
+.doc-shipping {
+  border-left-color: #4a90d9;
+}
+
+/* 揀貨單：琥珀色系 */
+.doc-picking {
+  border-left-color: #e0912b;
+}
+
+.doc-block-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.doc-block-header h3 {
+  margin: 0;
+}
+
+.doc-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.doc-btn {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  color: #fff;
+}
+
+.doc-btn-shipping { background: #4a90d9; }
+.doc-btn-shipping:hover { background: #357abd; }
+.doc-btn-picking { background: #e0912b; }
+.doc-btn-picking:hover { background: #c67a1e; }
+
+.doc-btn-outline {
+  background: #fff;
+  color: #555;
+  border: 1px solid #bbb;
+}
+.doc-btn-outline:hover:not(:disabled) {
+  background: #f2f2f2;
+}
+.doc-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.doc-empty {
+  color: #999;
+  font-size: 14px;
+  padding: 8px 0;
+}
+
+/* === 同步狀態列（銷售儀表板） === */
+.sync-status {
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 14px;
+  margin-bottom: 16px;
+  background: #f2f2f2;
+  color: #666;
+  border: 1px solid #e0e0e0;
+}
+.sync-status.synced {
+  background: #eef7f1;
+  color: #2e6b4d;
+  border-color: #b6ddc6;
+}
+.sync-status.demo {
+  background: #fff8e6;
+  color: #8a6d1f;
+  border-color: #f0dca0;
+}
+
 /* === 列印區域 === */
 .print-area {
   margin-top: 16px;
@@ -419,6 +517,8 @@ tr.duplicate {
   .upload-area,
   .filter-row,
   .error-msg,
+  .print-hint,
+  .doc-actions,
   #tab-import,
   #tab-dashboard {
     display: none !important;
@@ -430,9 +530,21 @@ tr.duplicate {
     padding: 0;
   }
 
-  #tab-print h2 {
+  #tab-print h2,
+  .doc-block-header h3 {
     display: none;
   }
+
+  /* 列印時移除單據區塊外框，僅保留單據內容 */
+  .doc-block {
+    border: none;
+    padding: 0;
+    margin: 0;
+  }
+
+  /* 依 body class 只顯示選定的單據；未指定時預設顯示出貨單 */
+  body.printing-shipping .doc-picking { display: none !important; }
+  body.printing-picking .doc-shipping { display: none !important; }
 
   .shipping-label {
     page-break-after: always;

@@ -27,23 +27,23 @@ var mockPinkoi = [
 
 var mockCyberbiz = [
   // 2024-01
-  { orderId: "#1201", platform: "CYBERBIZ", date: "2024-01-10", recipient: "陳大文", phone: "0900-111-201", address: "台中市太平區育才路446號", logistics: "7-11貨到付款", amount: 1012, items: [{ product: "栗米光采修護精華 30mL", quantity: 1 }] },
-  { orderId: "#1202", platform: "CYBERBIZ", date: "2024-01-11", recipient: "林小美", phone: "0900-111-202", address: "台北市大同區重慶北路二段50號", logistics: "宅配", amount: 2586, items: [{ product: "極光透亮二合一洗卸蜜 150mL", quantity: 1 }, { product: "栗米光采修護精華 30mL", quantity: 1 }] },
-  { orderId: "#1203", platform: "CYBERBIZ", date: "2024-01-15", recipient: "黃志明", phone: "0900-111-203", address: "新北市新莊區中正路100號", logistics: "全家取貨不付款", amount: 650, items: [{ product: "紅葡萄藻海洋舒緩凍膜 100ml", quantity: 1 }] },
-  { orderId: "#1204", platform: "CYBERBIZ", date: "2024-01-20", recipient: "吳雅琪", phone: "0900-111-204", address: "桃園市中壢區環中東路200號", logistics: "順豐物流配送", amount: 1898, items: [{ product: "極光飽水潤透輕凝霜 50mL 買一送一", quantity: 1 }] },
-  { orderId: "#1205", platform: "CYBERBIZ", date: "2024-01-25", recipient: "張家豪", phone: "0900-111-205", address: "台南市永康區中華路400號", logistics: "7-11取貨不付款", amount: 990, items: [{ product: "面面俱到-山海顏在地植萃面膜綜合組", quantity: 1 }] },
+  { orderId: "#1201", platform: "CYBERBIZ", date: "2024-01-10", recipient: "陳大文", phone: "0900-111-201", address: "台中市太平區育才路446號", logistics: "7-11貨到付款", amount: 890, items: [{ product: "手工香氛蠟燭", quantity: 2 }] },
+  { orderId: "#1202", platform: "CYBERBIZ", date: "2024-01-11", recipient: "林小美", phone: "0900-111-202", address: "台北市大同區重慶北路二段50號", logistics: "宅配", amount: 1840, items: [{ product: "陶瓷手沖咖啡杯", quantity: 1 }, { product: "皮革筆記本", quantity: 1 }] },
+  { orderId: "#1203", platform: "CYBERBIZ", date: "2024-01-15", recipient: "黃志明", phone: "0900-111-203", address: "新北市新莊區中正路100號", logistics: "全家取貨不付款", amount: 380, items: [{ product: "植物染圍巾", quantity: 1 }] },
+  { orderId: "#1204", platform: "CYBERBIZ", date: "2024-01-20", recipient: "吳雅琪", phone: "0900-111-204", address: "桃園市中壢區環中東路200號", logistics: "順豐物流配送", amount: 320, items: [{ product: "木質桌上收納盒", quantity: 1 }] },
+  { orderId: "#1205", platform: "CYBERBIZ", date: "2024-01-25", recipient: "張家豪", phone: "0900-111-205", address: "台南市永康區中華路400號", logistics: "7-11取貨不付款", amount: 450, items: [{ product: "純棉手帕禮盒", quantity: 3 }] },
   // 2024-02
-  { orderId: "#1210", platform: "CYBERBIZ", date: "2024-02-04", recipient: "李承恩", phone: "0900-111-210", address: "台北市內湖區成功路四段60號", logistics: "宅配", amount: 1993, items: [{ product: "極光透亮二合一洗卸蜜 150mL", quantity: 1 }] },
-  { orderId: "#1211", platform: "CYBERBIZ", date: "2024-02-09", recipient: "王詩涵", phone: "0900-111-211", address: "新北市板橋區民生路一段70號", logistics: "7-11貨到付款", amount: 1550, items: [{ product: "紅葡萄藻海洋舒緩凍膜 旅行瓶 30ml 買一送一", quantity: 1 }, { product: "栗米光采修護精華 30mL", quantity: 1 }] },
-  { orderId: "#1212", platform: "CYBERBIZ", date: "2024-02-14", recipient: "劉建宏", phone: "0900-111-212", address: "台中市北屯區崇德路二段80號", logistics: "宅配", amount: 1898, items: [{ product: "極光飽水潤透輕凝霜 50mL 買一送一", quantity: 1 }] },
-  { orderId: "#1213", platform: "CYBERBIZ", date: "2024-02-20", recipient: "蔡欣怡", phone: "0900-111-213", address: "桃園市桃園區復興路90號", logistics: "全家取貨不付款", amount: 599, items: [{ product: "精油香氛禮盒 睡眠噴霧與撥提棒", quantity: 1 }] },
-  { orderId: "#1214", platform: "CYBERBIZ", date: "2024-02-27", recipient: "許文彬", phone: "0900-111-214", address: "台南市東區林森路二段100號", logistics: "順豐物流配送", amount: 2024, items: [{ product: "栗米光采修護精華 30mL 買一送一", quantity: 1 }] },
+  { orderId: "#1210", platform: "CYBERBIZ", date: "2024-02-04", recipient: "李承恩", phone: "0900-111-210", address: "台北市內湖區成功路四段60號", logistics: "宅配", amount: 890, items: [{ product: "手工香氛蠟燭", quantity: 2 }] },
+  { orderId: "#1211", platform: "CYBERBIZ", date: "2024-02-09", recipient: "王詩涵", phone: "0900-111-211", address: "新北市板橋區民生路一段70號", logistics: "7-11貨到付款", amount: 1060, items: [{ product: "純棉手帕禮盒", quantity: 2 }, { product: "陶瓷手沖咖啡杯", quantity: 1 }] },
+  { orderId: "#1212", platform: "CYBERBIZ", date: "2024-02-14", recipient: "劉建宏", phone: "0900-111-212", address: "台中市北屯區崇德路二段80號", logistics: "宅配", amount: 1280, items: [{ product: "皮革筆記本", quantity: 1 }] },
+  { orderId: "#1213", platform: "CYBERBIZ", date: "2024-02-20", recipient: "蔡欣怡", phone: "0900-111-213", address: "桃園市桃園區復興路90號", logistics: "全家取貨不付款", amount: 760, items: [{ product: "植物染圍巾", quantity: 2 }] },
+  { orderId: "#1214", platform: "CYBERBIZ", date: "2024-02-27", recipient: "許文彬", phone: "0900-111-214", address: "台南市東區林森路二段100號", logistics: "順豐物流配送", amount: 780, items: [{ product: "陶瓷手沖咖啡杯", quantity: 1 }] },
   // 2024-03
-  { orderId: "#1220", platform: "CYBERBIZ", date: "2024-03-05", recipient: "鄭伊婷", phone: "0900-111-220", address: "台北市文山區木柵路一段110號", logistics: "宅配", amount: 1200, items: [{ product: "紅葡萄藻海洋舒緩凍膜 100ml 買一送一", quantity: 1 }] },
-  { orderId: "#1221", platform: "CYBERBIZ", date: "2024-03-11", recipient: "楊宗翰", phone: "0900-111-221", address: "新北市三重區三和路三段120號", logistics: "全家取貨不付款", amount: 1950, items: [{ product: "極光透亮二合一洗卸蜜 150mL", quantity: 1 }] },
-  { orderId: "#1222", platform: "CYBERBIZ", date: "2024-03-16", recipient: "周佩君", phone: "0900-111-222", address: "台中市南區復興路一段130號", logistics: "7-11貨到付款", amount: 1611, items: [{ product: "栗米光采修護精華 30mL", quantity: 1 }, { product: "精油香氛禮盒 睡眠噴霧與撥提棒", quantity: 1 }] },
-  { orderId: "#1223", platform: "CYBERBIZ", date: "2024-03-21", recipient: "何冠廷", phone: "0900-111-223", address: "桃園市龜山區文化一路140號", logistics: "宅配", amount: 990, items: [{ product: "面面俱到-山海顏在地植萃面膜綜合組", quantity: 1 }] },
-  { orderId: "#1224", platform: "CYBERBIZ", date: "2024-03-27", recipient: "賴思穎", phone: "0900-111-224", address: "台南市中西區府前路一段150號", logistics: "順豐物流配送", amount: 1993, items: [{ product: "極光透亮二合一洗卸蜜 150mL", quantity: 1 }] }
+  { orderId: "#1220", platform: "CYBERBIZ", date: "2024-03-05", recipient: "鄭伊婷", phone: "0900-111-220", address: "台北市文山區木柵路一段110號", logistics: "宅配", amount: 640, items: [{ product: "木質桌上收納盒", quantity: 2 }] },
+  { orderId: "#1221", platform: "CYBERBIZ", date: "2024-03-11", recipient: "楊宗翰", phone: "0900-111-221", address: "新北市三重區三和路三段120號", logistics: "全家取貨不付款", amount: 1335, items: [{ product: "手工香氛蠟燭", quantity: 3 }] },
+  { orderId: "#1222", platform: "CYBERBIZ", date: "2024-03-16", recipient: "周佩君", phone: "0900-111-222", address: "台中市南區復興路一段130號", logistics: "7-11貨到付款", amount: 1060, items: [{ product: "皮革筆記本", quantity: 1 }, { product: "純棉手帕禮盒", quantity: 1 }] },
+  { orderId: "#1223", platform: "CYBERBIZ", date: "2024-03-21", recipient: "何冠廷", phone: "0900-111-223", address: "桃園市龜山區文化一路140號", logistics: "宅配", amount: 380, items: [{ product: "植物染圍巾", quantity: 1 }] },
+  { orderId: "#1224", platform: "CYBERBIZ", date: "2024-03-27", recipient: "賴思穎", phone: "0900-111-224", address: "台南市中西區府前路一段150號", logistics: "順豐物流配送", amount: 780, items: [{ product: "陶瓷手沖咖啡杯", quantity: 1 }] }
 ];
 
 var allOrders = mockPinkoi.concat(mockCyberbiz);
@@ -467,7 +467,11 @@ document.getElementById('btn-clear').addEventListener('click', function() {
   document.getElementById('preview-table').querySelector('thead').innerHTML = '';
   document.getElementById('preview-table').querySelector('tbody').innerHTML = '';
   document.getElementById('cleaned-table').querySelector('tbody').innerHTML = '';
-  document.getElementById('print-area').innerHTML = '';
+  // 清空兩種單據區並停用列印按鈕
+  document.getElementById('shipping-area').innerHTML = '';
+  document.getElementById('picking-area').innerHTML = '';
+  document.getElementById('btn-print-shipping').disabled = true;
+  document.getElementById('btn-print-picking').disabled = true;
   // 儀表板回到內建模擬資料
   renderDashboard();
 });
@@ -650,9 +654,11 @@ document.getElementById('platform-filter').addEventListener('change', function()
 
 // ===== 出貨單（一筆訂單一張，含多項商品） =====
 document.getElementById('btn-shipping').addEventListener('click', function() {
-  var area = document.getElementById('print-area');
+  var area = document.getElementById('shipping-area');
+  var printBtn = document.getElementById('btn-print-shipping');
   if (currentOrders.length === 0) {
-    area.innerHTML = '<p>請先載入訂單資料</p>';
+    area.innerHTML = '<p class="doc-empty">請先於「訂單匯入」載入訂單資料</p>';
+    printBtn.disabled = true;
     return;
   }
   var html = '';
@@ -671,13 +677,16 @@ document.getElementById('btn-shipping').addEventListener('click', function() {
       '</div>';
   });
   area.innerHTML = html;
+  printBtn.disabled = false;  // 產生後才可列印
 });
 
 // ===== 揀貨單（依商品彙總，展開所有訂單的 items） =====
 document.getElementById('btn-picking').addEventListener('click', function() {
-  var area = document.getElementById('print-area');
+  var area = document.getElementById('picking-area');
+  var printBtn = document.getElementById('btn-print-picking');
   if (currentOrders.length === 0) {
-    area.innerHTML = '<p>請先載入訂單資料</p>';
+    area.innerHTML = '<p class="doc-empty">請先於「訂單匯入」載入訂單資料</p>';
+    printBtn.disabled = true;
     return;
   }
   var groups = {};
@@ -699,12 +708,23 @@ document.getElementById('btn-picking').addEventListener('click', function() {
   });
   html += '</tbody></table></div>';
   area.innerHTML = html;
+  printBtn.disabled = false;  // 產生後才可列印
 });
 
-// ===== 列印 =====
-document.getElementById('btn-print').addEventListener('click', function() {
-  window.print();
+// ===== 分別列印：以 body class 控制只列印指定單據 =====
+document.getElementById('btn-print-shipping').addEventListener('click', function() {
+  printDocument('printing-shipping');
 });
+document.getElementById('btn-print-picking').addEventListener('click', function() {
+  printDocument('printing-picking');
+});
+
+function printDocument(bodyClass) {
+  document.body.classList.add(bodyClass);
+  window.print();
+  // 列印對話框關閉後移除 class
+  setTimeout(function() { document.body.classList.remove(bodyClass); }, 500);
+}
 
 // ===== 營收與訂單合併圖（長條=營收，折線=訂單數） =====
 // items: [{label, revenue, orders}]
@@ -863,11 +883,32 @@ function renderDashboard() {
       '<span class="bar-percent">$' + it.revenue.toLocaleString() + '</span></div>';
   });
   document.getElementById('product-revenue-chart').innerHTML = chartHtml;
+
+  // 更新同步狀態
+  updateSyncStatus(source);
+}
+
+// 更新儀表板同步狀態列
+function updateSyncStatus(source) {
+  var el = document.getElementById('sync-status');
+  if (!el) return;
+  var isUploaded = (currentOrders && currentOrders.length > 0);
+  var time = new Date().toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  if (isUploaded) {
+    el.className = 'sync-status synced';
+    el.textContent = '✓ 已與訂單同步：共 ' + source.length + ' 筆訂單（' + time + '）';
+  } else {
+    el.className = 'sync-status demo';
+    el.textContent = '目前顯示內建範例資料（尚未載入訂單）。請至「訂單匯入」上傳，或點「與訂單同步」。';
+  }
 }
 
 // 篩選變更即重新渲染
 document.getElementById('range-filter').addEventListener('change', renderDashboard);
 document.getElementById('dash-platform-filter').addEventListener('change', renderDashboard);
+
+// 「與訂單同步」按鈕：以目前已載入的訂單重新渲染儀表板
+document.getElementById('btn-sync').addEventListener('click', renderDashboard);
 
 // 頁面載入後初始化儀表板
 renderDashboard();
