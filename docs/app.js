@@ -227,6 +227,8 @@ function finishImport(orders, fileNames) {
   renderPreviewFromOrders(orders.slice(0, 5));
   // 清洗結果（全部）
   renderCleanedTable(orders);
+  // 儀表板改用剛上傳的訂單重新渲染
+  renderDashboard();
 }
 
 // 偵測分隔符：比較第一行的 Tab 與逗號數量，多者為分隔符（Pinkoi 匯出常為 Tab 分隔）
@@ -457,6 +459,8 @@ function loadExample(data) {
     (data.length > 5 ? '（預覽顯示前 5 筆）' : '') + '。';
   renderPreviewFromOrders(data.slice(0, 5));
   renderCleanedTable(data);
+  // 儀表板改用剛載入的範例重新渲染
+  renderDashboard();
 }
 
 // ===== 原始預覽（表格式，統一訂單格式） =====
@@ -698,13 +702,20 @@ function drawComboChart(svgId, items) {
 }
 
 // ===== 時間範圍篩選 =====
-function getLatestDate() {
-  return allOrders.map(function(o) { return o.date; }).sort().slice(-1)[0];
+// 儀表板資料來源：已載入訂單則用 currentOrders，否則用內建模擬資料
+function dashboardSource() {
+  return (currentOrders && currentOrders.length > 0) ? currentOrders : allOrders;
+}
+
+function getLatestDate(orders) {
+  var src = orders || dashboardSource();
+  return src.map(function(o) { return o.date; }).sort().slice(-1)[0];
 }
 
 function filterByRange(orders, range) {
   if (range === 'all' || range === 'day' || range === 'month') return orders;
-  var latest = getLatestDate();
+  if (orders.length === 0) return orders;
+  var latest = getLatestDate(orders);
   var latestTime = new Date(latest).getTime();
   var days = range === '7d' ? 7 : 30;
   var startTime = latestTime - (days - 1) * 24 * 60 * 60 * 1000;
@@ -743,7 +754,8 @@ function renderDashboard() {
   var range = document.getElementById('range-filter').value;
   var platform = document.getElementById('dash-platform-filter').value;
 
-  var byPlatform = platform === 'all' ? allOrders : allOrders.filter(function(o) { return o.platform === platform; });
+  var source = dashboardSource();
+  var byPlatform = platform === 'all' ? source : source.filter(function(o) { return o.platform === platform; });
   var orders = filterByRange(byPlatform, range);
 
   // 摘要（營收以訂單層級 amount 加總，一筆只計一次）
