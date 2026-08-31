@@ -254,13 +254,53 @@ tr.duplicate {
   transition: width 0.3s;
 }
 
-.bar-fill.shopee { background: #ee4d2d; }
-.bar-fill.momo { background: #7b2d8b; }
+.bar-fill.pinkoi { background: #4a90d9; }
+
+.bar-label-wide {
+  width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 
 .bar-percent {
-  width: 45px;
+  width: 90px;
   font-size: 13px;
   text-align: right;
+}
+
+.bar-fill.cyberbiz { background: #ec6f2d; }
+
+/* === 儀表板篩選列 === */
+.dashboard-filters {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+  padding: 12px;
+  background: #f7f7f7;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+}
+
+.filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.filter-group label {
+  font-size: 12px;
+  color: #666;
+}
+
+.filter-group select {
+  padding: 8px 12px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 14px;
+  background: #fff;
+  min-width: 140px;
 }
 
 /* === 趨勢圖 === */
@@ -269,7 +309,8 @@ tr.duplicate {
   overflow-x: auto;
 }
 
-#trend-svg {
+#trend-svg,
+#revenue-svg {
   min-width: 400px;
 }
 
@@ -328,8 +369,26 @@ tr.duplicate {
     flex-direction: column;
   }
 
+  .dashboard-filters {
+    flex-direction: column;
+  }
+
+  .filter-group select {
+    width: 100%;
+  }
+
   .table-wrapper {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
+  }
+
+  .bar-label-wide {
+    width: 90px;
+    font-size: 12px;
+  }
+
+  .bar-percent {
+    width: 70px;
+    font-size: 12px;
   }
 }

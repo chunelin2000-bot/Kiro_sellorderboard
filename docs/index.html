@@ -28,8 +28,8 @@
 
     <!-- 載入範例按鈕 -->
     <div class="example-btns">
-      <button id="btn-shopee">載入蝦皮範例</button>
-      <button id="btn-momo">載入 MOMO 範例</button>
+      <button id="btn-pinkoi">載入 Pinkoi 範例</button>
+      <button id="btn-cyberbiz">載入 CYBERBIZ 範例</button>
     </div>
 
     <!-- 原始預覽 -->
@@ -41,18 +41,16 @@
       </table>
     </div>
 
-    <!-- 平台篩選 -->
+    <!-- 清洗結果 -->
+    <h3>清洗結果</h3>
     <div class="filter-row">
       <label for="platform-filter">篩選平台：</label>
       <select id="platform-filter">
         <option value="all">全部</option>
-        <option value="蝦皮">蝦皮</option>
-        <option value="MOMO">MOMO</option>
+        <option value="Pinkoi">Pinkoi</option>
+        <option value="CYBERBIZ">CYBERBIZ</option>
       </select>
     </div>
-
-    <!-- 清洗結果 -->
-    <h3>清洗結果</h3>
     <div class="table-wrapper">
       <table id="cleaned-table">
         <thead>
@@ -90,6 +88,28 @@
   <section id="tab-dashboard" class="tab-content">
     <h2>銷售儀表板</h2>
 
+    <!-- 篩選列：時間範圍 + 平台 -->
+    <div class="dashboard-filters">
+      <div class="filter-group">
+        <label for="range-filter">資料期間</label>
+        <select id="range-filter">
+          <option value="all">全部</option>
+          <option value="7d">過去 7 天</option>
+          <option value="30d">過去 30 天</option>
+          <option value="day">按日</option>
+          <option value="month">按月</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label for="dash-platform-filter">平台</label>
+        <select id="dash-platform-filter">
+          <option value="all">全部</option>
+          <option value="Pinkoi">Pinkoi</option>
+          <option value="CYBERBIZ">CYBERBIZ</option>
+        </select>
+      </div>
+    </div>
+
     <!-- 摘要卡片 -->
     <div class="summary-cards">
       <div class="card">
@@ -106,14 +126,10 @@
       </div>
     </div>
 
-    <!-- 平台占比 -->
-    <h3>各平台訂單占比</h3>
-    <div id="platform-chart" class="bar-chart"></div>
-
-    <!-- 近 7 日趨勢 -->
+    <!-- 近 7 日訂單趨勢 -->
     <h3>近 7 日訂單趨勢</h3>
     <div id="trend-chart" class="trend-chart">
-      <svg id="trend-svg" width="100%" height="200"></svg>
+      <svg id="trend-svg" width="100%" height="200" role="img" aria-label="近 7 日訂單趨勢長條圖"></svg>
     </div>
 
     <!-- 熱銷 TOP 5 -->
@@ -131,6 +147,16 @@
         <tbody></tbody>
       </table>
     </div>
+
+    <!-- 營收比較（依所選時間範圍動態呈現） -->
+    <h3 id="revenue-chart-title">營收比較</h3>
+    <div id="revenue-chart" class="trend-chart">
+      <svg id="revenue-svg" width="100%" height="220" role="img" aria-label="營收比較長條圖"></svg>
+    </div>
+
+    <!-- 產品別營收比較 -->
+    <h3>產品別營收比較</h3>
+    <div id="product-revenue-chart" class="bar-chart"></div>
   </section>
 
   <script src="app.js"></script>
