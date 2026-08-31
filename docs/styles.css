@@ -329,6 +329,55 @@ td.cell-issue {
   font-size: 13px;
 }
 
+/* === 出貨列印：異常標示 === */
+/* 出貨/揀貨單頂部彙總提示條 */
+.doc-issue-banner {
+  background: #fff4e5;
+  color: #8a5300;
+  border: 1px solid #f0c48a;
+  border-radius: 6px;
+  padding: 10px 14px;
+  margin-bottom: 16px;
+  font-size: 14px;
+}
+
+/* 有異常的出貨單：左側紅色標記邊 */
+.shipping-label.label-issue {
+  border-left: 5px solid #c62828;
+  background: #fffaf6;
+}
+
+.label-issue-notice {
+  color: #c62828;
+  font-weight: bold;
+  background: #ffecec;
+  border-radius: 4px;
+  padding: 6px 8px;
+  margin-bottom: 8px;
+}
+
+/* 異常欄位前的 ⚠ 標記 */
+.doc-warn-tag {
+  color: #c62828;
+  font-weight: bold;
+}
+
+/* 揀貨單中含異常訂單的商品列 */
+tr.picking-issue {
+  background: #fff8e6;
+}
+tr.picking-issue td:first-child::before {
+  content: "⚠ ";
+  color: #c62828;
+}
+
+/* 列印時：仍保留異常標記，方便人工複核（如需純淨版可自行移除） */
+@media print {
+  .doc-issue-banner {
+    border: 1px solid #999;
+  }
+}
+
 /* === 動作按鈕列 === */
 .action-btns {
   display: flex;

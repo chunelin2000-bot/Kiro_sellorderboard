@@ -73,7 +73,17 @@ document.querySelectorAll('.tab-btn').forEach(function(btn) {
     document.querySelectorAll('.tab-btn').forEach(function(b) { b.classList.remove('active'); });
     document.querySelectorAll('.tab-content').forEach(function(c) { c.classList.remove('active'); });
     btn.classList.add('active');
-    document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+    var tab = btn.dataset.tab;
+    document.getElementById('tab-' + tab).classList.add('active');
+
+    // 切換到儀表板時重新渲染，讓「訂單匯入」的確認/修正即時連動
+    if (tab === 'dashboard' && typeof renderDashboard === 'function') {
+      renderDashboard();
+    }
+    // 切換到出貨列印時清空舊單據，避免列印到未更新異常狀態的內容
+    if (tab === 'print' && typeof resetDocArea === 'function') {
+      resetDocArea();
+    }
   });
 });
 
@@ -219,6 +229,7 @@ function finishImport(orders, fileNames) {
     return;
   }
   currentOrders = orders;
+  ensureOrderUids(currentOrders);  // 指派穩定 _uid 供跨分頁異常判定
   reviewStatus = {};  // 新資料匯入，清空舊的確認狀態
   // 狀態列：顯示檔案數與訂單數
   importStatus.hidden = false;
@@ -451,6 +462,7 @@ document.getElementById('btn-example').addEventListener('click', function() {
 function loadExample(data) {
   uploadError.hidden = true;
   currentOrders = data;
+  ensureOrderUids(currentOrders);  // 指派穩定 _uid 供跨分頁異常判定
   reviewStatus = {};  // 載入範例，清空舊的確認狀態
   importStatus.hidden = false;
   importStatus.textContent = '已載入範例資料，共 ' + data.length + ' 筆訂單' +
@@ -625,9 +637,46 @@ function normalizeDate(d) {
 }
 
 // ===== 異常偵測 =====
-// 為每筆訂單標記穩定 key（用於保存確認狀態），以編號 + 索引避免重複編號互相覆蓋
-function orderKey(o, index) {
-  return (o.orderId || '無編號') + '#' + index;
+// 為每筆訂單指派穩定的唯一識別（跨分頁共用，不受篩選/排序影響）
+var _uidSeq = 0;
+function ensureOrderUids(orders) {
+  orders.forEach(function(o) {
+    if (o._uid == null) o._uid = 'ord_' + (++_uidSeq);
+  });
+}
+
+// 訂單的確認狀態 key：以穩定 _uid 為準，讓「確認無誤」能跨三個分頁一致生效
+function orderKey(o) {
+  return o._uid || ('legacy_' + (o.orderId || '無編號'));
+}
+
+// 在整份訂單清單層級計算重複的訂單編號集合
+function buildDupIds(orders) {
+  var idCount = {};
+  orders.forEach(function(o) { if (o.orderId) idCount[o.orderId] = (idCount[o.orderId] || 0) + 1; });
+  var dupIds = {};
+  Object.keys(idCount).forEach(function(id) { if (idCount[id] > 1) dupIds[id] = true; });
+  return dupIds;
+}
+
+// 判斷單筆訂單「目前仍需警示」的異常（排除已確認無誤者）
+// dupIds 以「全部訂單」計算，確保重複判定跨分頁一致
+function activeIssues(o, dupIds, todayEnd) {
+  if (reviewStatus[orderKey(o)] === 'confirmed') return [];
+  return detectOrderIssues(o, dupIds, todayEnd);
+}
+
+// 將訂單分成「正常/已確認」與「仍有異常」兩組，供出貨列印與儀表板使用
+function splitByIssues(orders) {
+  var dupIds = buildDupIds(currentOrders && currentOrders.length ? currentOrders : orders);
+  var todayEnd = endOfToday();
+  var clean = [], flagged = [];
+  orders.forEach(function(o) {
+    var iss = activeIssues(o, dupIds, todayEnd);
+    if (iss.length > 0) { flagged.push({ order: o, issues: iss }); }
+    else { clean.push(o); }
+  });
+  return { clean: clean, flagged: flagged, dupIds: dupIds, todayEnd: todayEnd };
 }
 
 // 取得今天 23:59:59 的時間戳，避免「今天成立」的訂單被誤判為未來
@@ -667,14 +716,12 @@ var reviewStatus = {};
 
 // ===== 清洗結果表格（一列一筆訂單，含異常警示） =====
 function renderCleanedTable(orders) {
+  ensureOrderUids(orders);
   var pf = document.getElementById('platform-filter').value;
   var filtered = pf === 'all' ? orders : orders.filter(function(o) { return o.platform === pf; });
 
-  // 重複訂單編號：在篩選後的清單層級計算
-  var idCount = {};
-  filtered.forEach(function(o) { idCount[o.orderId] = (idCount[o.orderId] || 0) + 1; });
-  var dupIds = {};
-  Object.keys(idCount).forEach(function(id) { if (idCount[id] > 1) dupIds[id] = true; });
+  // 重複訂單編號：以「全部訂單」計算，確保與出貨列印、儀表板判定一致
+  var dupIds = buildDupIds(orders);
 
   var todayEnd = endOfToday();
 
@@ -686,7 +733,7 @@ function renderCleanedTable(orders) {
   tbody.innerHTML = '';
 
   filtered.forEach(function(o, index) {
-    var key = orderKey(o, index);
+    var key = orderKey(o);
     var issues = detectOrderIssues(o, dupIds, todayEnd);
     var status = reviewStatus[key] || (issues.length > 0 ? 'pending' : '');
     var confirmed = status === 'confirmed';
@@ -811,7 +858,6 @@ function bindReviewActions(orders) {
     input.addEventListener('change', function() {
       var key = input.dataset.key;
       var field = input.dataset.field;
-      // key 形如 "編號#index"，取最後的 index 對回篩選後清單
       applyEdit(orders, key, field, input.value);
       renderCleanedTable(orders);
     });
@@ -820,12 +866,9 @@ function bindReviewActions(orders) {
 
 // 依 orderKey 找到訂單並套用編輯（在 orders 原陣列上更新，確保匯出/儀表板同步）
 function applyEdit(orders, key, field, value) {
-  var pf = document.getElementById('platform-filter').value;
-  var filtered = pf === 'all' ? orders : orders.filter(function(o) { return o.platform === pf; });
-
-  for (var i = 0; i < filtered.length; i++) {
-    if (orderKey(filtered[i], i) === key) {
-      var target = filtered[i];
+  for (var i = 0; i < orders.length; i++) {
+    if (orderKey(orders[i]) === key) {
+      var target = orders[i];
       if (field === 'date') {
         target.date = normalizeDate(value);
       } else if (field === 'amount') {
@@ -856,18 +899,51 @@ function filteredDocOrders() {
   return pf === 'all' ? currentOrders : currentOrders.filter(function(o) { return o.platform === pf; });
 }
 
-// 產生出貨單 HTML（一筆訂單一張，含訂單日期與多項商品）
+// 出貨列印區的異常彙總提示條（含未確認異常時顯示）
+function docIssueBanner(flaggedCount) {
+  if (flaggedCount === 0) return '';
+  return '<div class="doc-issue-banner">⚠ 本次共有 ' + flaggedCount +
+    ' 筆訂單存在未確認異常（未來日期／金額為 0／重複訂單號），已於單據上標示。' +
+    '建議先至「訂單匯入」確認或修正後再出貨，避免出錯貨或重複出貨。</div>';
+}
+
+// 產生出貨單 HTML（一筆訂單一張，含訂單日期與多項商品；異常訂單加標示）
 function buildShippingHtml(orders) {
-  var html = '';
+  var split = splitByIssues(orders);
+  // 建立 uid -> issues 對照，方便逐筆查詢
+  var issueMap = {};
+  split.flagged.forEach(function(f) { issueMap[orderKey(f.order)] = f.issues; });
+
+  var html = docIssueBanner(split.flagged.length);
+
   orders.forEach(function(o) {
+    var issues = issueMap[orderKey(o)] || [];
+    var hasIssue = issues.length > 0;
+    var fieldIssue = {};
+    issues.forEach(function(iss) { fieldIssue[iss.field] = iss; });
+
     var itemRows = o.items.map(function(it) {
       return '<li>' + escapeHtml(it.product) + ' × ' + it.quantity + '</li>';
     }).join('');
-    html += '<div class="shipping-label">' +
+
+    // 各欄位標示：異常欄位前加 ⚠
+    function line(label, field, value) {
+      var mark = fieldIssue[field] ? '<span class="doc-warn-tag">⚠</span> ' : '';
+      return '<p><strong>' + label + '：</strong>' + mark + escapeHtml(value) + '</p>';
+    }
+
+    var issueNotice = '';
+    if (hasIssue) {
+      var msgs = issues.map(function(iss) { return escapeHtml(iss.message); }).join('；');
+      issueNotice = '<p class="label-issue-notice">⚠ 異常提醒：' + msgs + '</p>';
+    }
+
+    html += '<div class="shipping-label' + (hasIssue ? ' label-issue' : '') + '">' +
       '<h4>出貨單</h4>' +
-      '<p><strong>訂單編號：</strong>' + escapeHtml(o.orderId) + '</p>' +
+      issueNotice +
+      line('訂單編號', 'orderId', o.orderId) +
       '<p><strong>平台：</strong>' + escapeHtml(o.platform) + '</p>' +
-      '<p><strong>訂單日期：</strong>' + escapeHtml(o.date) + '</p>' +
+      line('訂單日期', 'date', o.date) +
       '<p><strong>收件人：</strong>' + escapeHtml(o.recipient) + '</p>' +
       '<p><strong>電話：</strong>' + escapeHtml(o.phone) + '</p>' +
       '<p><strong>地址：</strong>' + escapeHtml(o.address) + '</p>' +
@@ -878,23 +954,37 @@ function buildShippingHtml(orders) {
   return html;
 }
 
-// 產生揀貨單 HTML（依商品彙總）
+// 產生揀貨單 HTML（依商品彙總；含異常訂單的商品加註記）
 function buildPickingHtml(orders) {
+  var split = splitByIssues(orders);
+  var flaggedIds = {};
+  split.flagged.forEach(function(f) { if (f.order.orderId) flaggedIds[f.order.orderId] = true; });
+
   var groups = {};
   orders.forEach(function(o) {
     o.items.forEach(function(it) {
-      if (!groups[it.product]) groups[it.product] = { qty: 0, orders: [] };
+      if (!groups[it.product]) groups[it.product] = { qty: 0, orders: [], hasIssue: false };
       groups[it.product].qty += it.quantity;
       if (groups[it.product].orders.indexOf(o.orderId) === -1) {
         groups[it.product].orders.push(o.orderId);
       }
+      if (flaggedIds[o.orderId]) groups[it.product].hasIssue = true;
     });
   });
-  var html = '<div class="picking-list"><h4>揀貨單</h4><table>' +
+
+  var html = docIssueBanner(split.flagged.length);
+  html += '<div class="picking-list"><h4>揀貨單</h4><table>' +
     '<thead><tr><th>商品名稱</th><th>總需求數量</th><th>對應訂單</th></tr></thead><tbody>';
   Object.keys(groups).forEach(function(product) {
     var g = groups[product];
-    html += '<tr><td>' + escapeHtml(product) + '</td><td>' + g.qty + '</td><td>' + escapeHtml(g.orders.join(', ')) + '</td></tr>';
+    // 對應訂單中屬於異常者，於編號前加 ⚠
+    var orderCells = g.orders.map(function(id) {
+      return (flaggedIds[id] ? '⚠ ' : '') + escapeHtml(id);
+    }).join(', ');
+    html += '<tr' + (g.hasIssue ? ' class="picking-issue"' : '') + '>' +
+      '<td>' + escapeHtml(product) + '</td>' +
+      '<td>' + g.qty + '</td>' +
+      '<td>' + orderCells + '</td></tr>';
   });
   html += '</tbody></table></div>';
   return html;
@@ -988,7 +1078,9 @@ function drawComboChart(svgId, items) {
 // ===== 時間範圍篩選 =====
 // 儀表板資料來源：已載入訂單則用 currentOrders，否則用內建模擬資料
 function dashboardSource() {
-  return (currentOrders && currentOrders.length > 0) ? currentOrders : allOrders;
+  var src = (currentOrders && currentOrders.length > 0) ? currentOrders : allOrders;
+  ensureOrderUids(src);  // 確保來源資料皆有穩定 _uid
+  return src;
 }
 
 function getLatestDate(orders) {
@@ -1033,6 +1125,32 @@ function rangeTitle(range) {
   }
 }
 
+// 儀表板異常提示：說明有幾筆異常訂單被排除在統計之外
+function renderDashboardIssueNotice(flagged) {
+  var el = document.getElementById('dash-issue-notice');
+  if (!el) return;
+
+  if (!flagged || flagged.length === 0) {
+    el.className = 'issue-summary';
+    el.textContent = '';
+    return;
+  }
+
+  // 依類型統計被排除的異常
+  var counts = { 'future-date': 0, 'zero-amount': 0, 'duplicate-id': 0 };
+  flagged.forEach(function(f) {
+    f.issues.forEach(function(iss) { if (counts[iss.type] != null) counts[iss.type]++; });
+  });
+  var parts = [];
+  if (counts['future-date'] > 0) parts.push('未來日期 ' + counts['future-date'] + ' 筆');
+  if (counts['zero-amount'] > 0) parts.push('金額為 0 ' + counts['zero-amount'] + ' 筆');
+  if (counts['duplicate-id'] > 0) parts.push('重複訂單號 ' + counts['duplicate-id'] + ' 筆');
+
+  el.className = 'issue-summary warn';
+  el.textContent = '⚠ 已排除 ' + flagged.length + ' 筆未確認異常訂單，不列入下方統計（' +
+    parts.join('、') + '）。請至「訂單匯入」確認無誤或修正後，統計才會納入這些訂單。';
+}
+
 // ===== 儀表板（依篩選條件重新渲染） =====
 function renderDashboard() {
   var range = document.getElementById('range-filter').value;
@@ -1040,7 +1158,13 @@ function renderDashboard() {
 
   var source = dashboardSource();
   var byPlatform = platform === 'all' ? source : source.filter(function(o) { return o.platform === platform; });
-  var orders = filterByRange(byPlatform, range);
+  var allInRange = filterByRange(byPlatform, range);
+
+  // 異常連動：排除仍未確認的異常訂單，避免污染營收/客單價/趨勢統計
+  var split = splitByIssues(allInRange);
+  var orders = split.clean;                 // 統計僅採用「正常或已確認」的訂單
+  var excludedCount = split.flagged.length; // 被排除的異常訂單數
+  renderDashboardIssueNotice(split.flagged);
 
   // 摘要（營收以訂單層級 amount 加總，一筆只計一次）
   var totalOrders = orders.length;
