@@ -186,13 +186,6 @@
     </div>
     <div id="customer-ratio-bar" class="ratio-bar" role="img" aria-label="新客與回購客佔比"></div>
 
-    <!-- 回購率趨勢（B，按月） -->
-    <h3>回購率趨勢（按月）</h3>
-    <p class="chart-note">回購率＝當月「先前曾購買過」的客戶數 ÷ 當月活躍客戶數。</p>
-    <div id="repeat-trend-chart" class="trend-chart">
-      <svg id="repeat-trend-svg" width="100%" height="220" role="img" aria-label="每月回購率趨勢折線圖"></svg>
-    </div>
-
     <!-- 營收與訂單合併圖（依所選時間範圍動態呈現） -->
     <h3 id="revenue-chart-title">營收與訂單趨勢</h3>
     <div class="chart-legend">
@@ -201,6 +194,13 @@
     </div>
     <div id="revenue-chart" class="trend-chart">
       <svg id="revenue-svg" width="100%" height="240" role="img" aria-label="營收與訂單趨勢合併圖"></svg>
+    </div>
+
+    <!-- 回購率趨勢（B，按月；置於營收趨勢之後） -->
+    <h3>回購率趨勢（按月）</h3>
+    <p class="chart-note">回購率＝當月「先前曾購買過」的客戶數 ÷ 當月活躍客戶數。</p>
+    <div id="repeat-trend-chart" class="trend-chart">
+      <svg id="repeat-trend-svg" width="100%" height="220" role="img" aria-label="每月回購率趨勢折線圖"></svg>
     </div>
 
     <!-- 熱銷 TOP 5 -->
