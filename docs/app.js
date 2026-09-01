@@ -1294,6 +1294,131 @@ function renderDashboardIssueNotice(flagged) {
     parts.join('、') + '）。請至「訂單匯入」確認無誤或修正後，統計才會納入這些訂單。';
 }
 
+// ===== 新客／回購客分析 =====
+// 客戶識別 key：電話＋姓名組合（皆正規化去除空白與符號差異）；兩者皆空則不計入
+function customerKey(o) {
+  var phone = (o.phone || '').replace(/[\s\-()]/g, '').toLowerCase();
+  var name = (o.recipient || '').replace(/\s/g, '').toLowerCase();
+  if (!phone && !name) return '';
+  return phone + '|' + name;
+}
+
+// 計算每位客戶的「最早購買日期」（以完整歷史為基準）
+function buildFirstOrderMap(historyOrders) {
+  var firstDate = {};
+  historyOrders.forEach(function(o) {
+    var key = customerKey(o);
+    if (!key || !o.date) return;
+    if (!firstDate[key] || o.date < firstDate[key]) firstDate[key] = o.date;
+  });
+  return firstDate;
+}
+
+// 渲染 A（新客/回購客卡片與佔比橫條）與 B（回購率趨勢折線）
+// historyClean：完整歷史（判定首購用）；orders：所選期間的訂單（呈現用）
+function renderCustomerAnalysis(historyClean, orders) {
+  var firstDateMap = buildFirstOrderMap(historyClean);
+
+  // --- A：以「所選期間出現的客戶」分類新客/回購客（一位客戶只計一次） ---
+  var seen = {};          // 期間內已計算過的客戶
+  var newCount = 0, repeatCount = 0;
+  orders.forEach(function(o) {
+    var key = customerKey(o);
+    if (!key || seen[key]) return;
+    seen[key] = true;
+    // 該客戶的首購日若早於本筆訂單日期 → 回購客；否則為期間內新客
+    var first = firstDateMap[key];
+    if (first && o.date && first < o.date) repeatCount++;
+    else newCount++;
+  });
+  var totalCust = newCount + repeatCount;
+  var repeatRatio = totalCust > 0 ? Math.round(repeatCount / totalCust * 100) : 0;
+
+  document.getElementById('new-customers').textContent = newCount;
+  document.getElementById('repeat-customers').textContent = repeatCount;
+  document.getElementById('repeat-ratio').textContent = repeatRatio + '%';
+
+  var bar = document.getElementById('customer-ratio-bar');
+  if (bar) {
+    if (totalCust === 0) {
+      bar.innerHTML = '<span class="ratio-empty">尚無足夠客戶資料</span>';
+    } else {
+      var newPct = Math.round(newCount / totalCust * 100);
+      var repeatPct = 100 - newPct;
+      bar.innerHTML =
+        '<div class="ratio-seg seg-new" style="width:' + newPct + '%" title="新客 ' + newCount + ' 人">' +
+          (newPct >= 12 ? newPct + '%' : '') + '</div>' +
+        '<div class="ratio-seg seg-repeat" style="width:' + repeatPct + '%" title="回購客 ' + repeatCount + ' 人">' +
+          (repeatPct >= 12 ? repeatPct + '%' : '') + '</div>';
+    }
+  }
+
+  // --- B：回購率趨勢（按月）---
+  // 當月回購率 = 當月「首購日早於本月」的客戶數 ÷ 當月活躍客戶數
+  var monthly = {};   // 'YYYY-MM' -> { active:{}, repeat:{} }
+  orders.forEach(function(o) {
+    var key = customerKey(o);
+    if (!key || !o.date) return;
+    var month = o.date.slice(0, 7);
+    if (!monthly[month]) monthly[month] = { active: {}, repeat: {} };
+    monthly[month].active[key] = true;
+    var first = firstDateMap[key];
+    // 首購月早於當月 → 該月的回購客
+    if (first && first.slice(0, 7) < month) monthly[month].repeat[key] = true;
+  });
+  var trendItems = Object.keys(monthly).sort().map(function(m) {
+    var activeN = Object.keys(monthly[m].active).length;
+    var repeatN = Object.keys(monthly[m].repeat).length;
+    return { label: m, rate: activeN > 0 ? Math.round(repeatN / activeN * 100) : 0 };
+  }).slice(-12);
+  drawRepeatTrend('repeat-trend-svg', trendItems);
+}
+
+// 繪製回購率趨勢折線圖（百分比，0–100）
+function drawRepeatTrend(svgId, items) {
+  var svg = document.getElementById(svgId);
+  if (!svg) return;
+
+  if (items.length === 0) {
+    svg.innerHTML = '<text x="10" y="30" font-size="12" fill="#999">尚無資料</text>';
+    svg.setAttribute('viewBox', '0 0 300 60');
+    return;
+  }
+
+  var gap = 70, startX = 46, baseY = 170, chartHeight = 140;
+  var svgWidth = startX + items.length * gap + 20;
+  var svgHeight = 210;
+
+  var content = '';
+  // Y 軸基準線（0% 與 100%）
+  content += '<line x1="' + startX + '" y1="' + baseY + '" x2="' + (svgWidth - 10) + '" y2="' + baseY + '" stroke="#e0e0e0"/>';
+  content += '<line x1="' + startX + '" y1="' + (baseY - chartHeight) + '" x2="' + (svgWidth - 10) + '" y2="' + (baseY - chartHeight) + '" stroke="#f0f0f0"/>';
+  content += '<text x="' + (startX - 8) + '" y="' + (baseY + 4) + '" text-anchor="end" font-size="9" fill="#999">0%</text>';
+  content += '<text x="' + (startX - 8) + '" y="' + (baseY - chartHeight + 4) + '" text-anchor="end" font-size="9" fill="#999">100%</text>';
+
+  var points = items.map(function(it, i) {
+    return {
+      x: startX + i * gap + 10,
+      y: baseY - (it.rate / 100) * chartHeight,
+      rate: it.rate,
+      label: it.label
+    };
+  });
+
+  if (points.length > 1) {
+    var path = points.map(function(p, i) { return (i === 0 ? 'M' : 'L') + p.x + ' ' + p.y; }).join(' ');
+    content += '<path d="' + path + '" fill="none" stroke="#7b5cd6" stroke-width="2"/>';
+  }
+  points.forEach(function(p) {
+    content += '<circle cx="' + p.x + '" cy="' + p.y + '" r="3.5" fill="#7b5cd6"/>';
+    content += '<text x="' + p.x + '" y="' + (p.y - 8) + '" text-anchor="middle" font-size="9" fill="#7b5cd6">' + p.rate + '%</text>';
+    content += '<text x="' + p.x + '" y="' + (baseY + 16) + '" text-anchor="middle" font-size="10">' + escapeHtml(p.label) + '</text>';
+  });
+
+  svg.innerHTML = content;
+  svg.setAttribute('viewBox', '0 0 ' + svgWidth + ' ' + svgHeight);
+}
+
 // ===== 儀表板（依篩選條件重新渲染） =====
 function renderDashboard() {
   var range = document.getElementById('range-filter').value;
@@ -1322,6 +1447,12 @@ function renderDashboard() {
   document.getElementById('revenue-chart-title').textContent = rangeTitle(range);
   var comboItems = buildComboItems(orders, range).slice(-12);
   drawComboChart('revenue-svg', comboItems);
+
+  // 新客／回購客分析（A）與回購率趨勢（B）
+  // 以「平台篩選後、未經時間範圍過濾」的乾淨訂單為完整歷史基準，
+  // 才能正確判斷某客戶在所選期間是否為第一次購買（新客）。
+  var historyClean = splitByIssues(byPlatform).clean;
+  renderCustomerAnalysis(historyClean, orders);
 
   // 熱銷 TOP 5（展開 items 計數量；營收以該商品 items 佔訂單金額比例估算不精確，改用數量排序並顯示訂單數）
   var productSales = {};

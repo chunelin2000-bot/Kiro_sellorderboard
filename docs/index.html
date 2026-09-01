@@ -163,6 +163,36 @@
       </div>
     </div>
 
+    <!-- 新客／回購客分析（A） -->
+    <h3>新客／回購客分析</h3>
+    <p class="chart-note">客戶以「電話＋姓名」組合識別，遮罩或缺漏欄位可能影響準確度，僅供參考。</p>
+    <div class="summary-cards">
+      <div class="card">
+        <span class="card-label">新客數</span>
+        <span class="card-value" id="new-customers">0</span>
+      </div>
+      <div class="card">
+        <span class="card-label">回購客數</span>
+        <span class="card-value" id="repeat-customers">0</span>
+      </div>
+      <div class="card">
+        <span class="card-label">回購客佔比</span>
+        <span class="card-value" id="repeat-ratio">0%</span>
+      </div>
+    </div>
+    <div class="chart-legend">
+      <span class="legend-item"><span class="legend-swatch swatch-new"></span>新客</span>
+      <span class="legend-item"><span class="legend-swatch swatch-repeat"></span>回購客</span>
+    </div>
+    <div id="customer-ratio-bar" class="ratio-bar" role="img" aria-label="新客與回購客佔比"></div>
+
+    <!-- 回購率趨勢（B，按月） -->
+    <h3>回購率趨勢（按月）</h3>
+    <p class="chart-note">回購率＝當月「先前曾購買過」的客戶數 ÷ 當月活躍客戶數。</p>
+    <div id="repeat-trend-chart" class="trend-chart">
+      <svg id="repeat-trend-svg" width="100%" height="220" role="img" aria-label="每月回購率趨勢折線圖"></svg>
+    </div>
+
     <!-- 營收與訂單合併圖（依所選時間範圍動態呈現） -->
     <h3 id="revenue-chart-title">營收與訂單趨勢</h3>
     <div class="chart-legend">
