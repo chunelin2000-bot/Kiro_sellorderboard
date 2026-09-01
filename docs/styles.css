@@ -389,6 +389,11 @@ td.cell-issue {
   align-self: center;
 }
 
+/* 出貨單分頁列：上下各一條，底部那條加點間距 */
+.doc-pagination {
+  margin-top: 16px;
+}
+
 @media (max-width: 767px) {
   .pagination {
     flex-direction: column;
@@ -795,6 +800,7 @@ tr.picking-issue td:first-child::before {
   .error-msg,
   .print-hint,
   .doc-toolbar,
+  .pagination,
   #tab-import,
   #tab-dashboard {
     display: none !important;

@@ -1034,6 +1034,9 @@ var docArea = document.getElementById('doc-area');
 var btnGenerate = document.getElementById('btn-generate');
 var btnPrintDoc = document.getElementById('btn-print-doc');
 
+var DOC_PAGE_SIZE = 10;   // 出貨單每頁筆數
+var docPage = 1;          // 出貨單目前頁碼
+
 // 依所選平台篩選目前訂單
 function filteredDocOrders() {
   var pf = docPlatformSelect.value;
@@ -1049,13 +1052,14 @@ function docIssueBanner(flaggedCount) {
 }
 
 // 產生出貨單 HTML（一筆訂單一張，含訂單日期與多項商品；異常訂單加標示）
-function buildShippingHtml(orders) {
+// skipBanner：分頁模式下由外層統一顯示彙總提示，這裡不再重複輸出
+function buildShippingHtml(orders, skipBanner) {
   var split = splitByIssues(orders);
   // 建立 uid -> issues 對照，方便逐筆查詢
   var issueMap = {};
   split.flagged.forEach(function(f) { issueMap[orderKey(f.order)] = f.issues; });
 
-  var html = docIssueBanner(split.flagged.length);
+  var html = skipBanner ? '' : docIssueBanner(split.flagged.length);
 
   orders.forEach(function(o) {
     var issues = issueMap[orderKey(o)] || [];
@@ -1137,8 +1141,8 @@ function resetDocArea() {
   btnPrintDoc.disabled = true;
 }
 
-// 產生：依所選單據類型與平台渲染到共用顯示區
-btnGenerate.addEventListener('click', function() {
+// 渲染出貨列印顯示區（出貨單分頁每頁 10 筆；揀貨單為彙總視圖不分頁）
+function renderDocArea() {
   if (currentOrders.length === 0) {
     docArea.innerHTML = '<p class="doc-empty">請先於「訂單匯入」載入訂單資料。</p>';
     btnPrintDoc.disabled = true;
@@ -1150,20 +1154,100 @@ btnGenerate.addEventListener('click', function() {
     btnPrintDoc.disabled = true;
     return;
   }
+
   var type = docTypeSelect.value;
-  docArea.innerHTML = (type === 'picking') ? buildPickingHtml(orders) : buildShippingHtml(orders);
+  if (type === 'picking') {
+    // 揀貨單：依商品彙總，維持單一視圖不分頁
+    docArea.innerHTML = buildPickingHtml(orders);
+  } else {
+    // 出貨單：一筆一張，依 10 筆分頁
+    var totalPages = Math.max(1, Math.ceil(orders.length / DOC_PAGE_SIZE));
+    if (docPage > totalPages) docPage = totalPages;
+    if (docPage < 1) docPage = 1;
+    var startIdx = (docPage - 1) * DOC_PAGE_SIZE;
+    var pageOrders = orders.slice(startIdx, startIdx + DOC_PAGE_SIZE);
+
+    // 彙總提示以「全部訂單」計算，讓使用者知道整批的異常筆數
+    var splitAll = splitByIssues(orders);
+    var pageHtml = docIssueBanner(splitAll.flagged.length) + buildShippingHtml(pageOrders, true);
+    docArea.innerHTML = docPaginationBar(orders.length, totalPages, startIdx, pageOrders.length) +
+      pageHtml +
+      docPaginationBar(orders.length, totalPages, startIdx, pageOrders.length);
+    bindDocPagination(orders.length);
+  }
   btnPrintDoc.disabled = false;  // 產生後才可列印
+}
+
+// 出貨單分頁控制列
+function docPaginationBar(totalCount, totalPages, startIdx, pageCount) {
+  var from = startIdx + 1;
+  var to = startIdx + pageCount;
+  var info = '第 ' + from + '–' + to + ' 筆，共 ' + totalCount + ' 筆（第 ' +
+    docPage + ' / ' + totalPages + ' 頁）';
+  var prevDisabled = docPage <= 1 ? ' disabled' : '';
+  var nextDisabled = docPage >= totalPages ? ' disabled' : '';
+
+  var pageItems = buildPageItems(docPage, totalPages);
+  var numberBtns = pageItems.map(function(p) {
+    if (p === '...') return '<span class="page-ellipsis" aria-hidden="true">…</span>';
+    var activeCls = p === docPage ? ' active' : '';
+    var current = p === docPage ? ' aria-current="page"' : '';
+    return '<button class="page-btn page-num doc-page-btn' + activeCls + '" data-doc-page="' + p +
+      '"' + current + ' aria-label="第 ' + p + ' 頁">' + p + '</button>';
+  }).join('');
+
+  return '<nav class="pagination doc-pagination" aria-label="出貨單分頁">' +
+    '<span class="page-info">' + info + '</span>' +
+    '<div class="page-btns">' +
+      '<button class="page-btn doc-page-btn" data-doc-page="first"' + prevDisabled + ' aria-label="第一頁">« 第一頁</button>' +
+      '<button class="page-btn doc-page-btn" data-doc-page="prev"' + prevDisabled + ' aria-label="上一頁">‹ 上一頁</button>' +
+      numberBtns +
+      '<button class="page-btn doc-page-btn" data-doc-page="next"' + nextDisabled + ' aria-label="下一頁">下一頁 ›</button>' +
+      '<button class="page-btn doc-page-btn" data-doc-page="last"' + nextDisabled + ' aria-label="最後一頁">最後一頁 »</button>' +
+    '</div></nav>';
+}
+
+// 綁定出貨單分頁按鈕事件
+function bindDocPagination(totalCount) {
+  var totalPages = Math.max(1, Math.ceil(totalCount / DOC_PAGE_SIZE));
+  docArea.querySelectorAll('.doc-page-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      if (btn.disabled) return;
+      var action = btn.dataset.docPage;
+      if (action === 'first') docPage = 1;
+      else if (action === 'prev') docPage = Math.max(1, docPage - 1);
+      else if (action === 'next') docPage = Math.min(totalPages, docPage + 1);
+      else if (action === 'last') docPage = totalPages;
+      else {
+        var target = parseInt(action, 10);
+        if (!isNaN(target)) docPage = Math.min(totalPages, Math.max(1, target));
+      }
+      renderDocArea();
+      var wrap = document.getElementById('doc-area');
+      if (wrap) wrap.scrollTop = 0;
+    });
+  });
+}
+
+// 產生：依所選單據類型與平台渲染到共用顯示區（每次產生從第 1 頁開始）
+btnGenerate.addEventListener('click', function() {
+  docPage = 1;
+  renderDocArea();
 });
 
 // 切換單據類型時清空顯示區，避免列印到舊單據
 docTypeSelect.addEventListener('change', function() {
+  docPage = 1;
   resetDocArea();
   // 產生按鈕顏色隨類型變化（出貨單藍、揀貨單琥珀）
   btnGenerate.className = 'doc-btn ' + (docTypeSelect.value === 'picking' ? 'doc-btn-picking' : 'doc-btn-shipping');
 });
 
 // 切換平台時同樣清空顯示區
-docPlatformSelect.addEventListener('change', resetDocArea);
+docPlatformSelect.addEventListener('change', function() {
+  docPage = 1;
+  resetDocArea();
+});
 
 // 列印目前顯示的單據
 btnPrintDoc.addEventListener('click', function() {
