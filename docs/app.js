@@ -229,6 +229,7 @@ function finishImport(orders, fileNames) {
   currentOrders = orders;
   ensureOrderUids(currentOrders);  // 指派穩定 _uid 供跨分頁異常判定
   reviewStatus = {};  // 新資料匯入，清空舊的確認狀態
+  currentPage = 1;    // 回到第一頁
   // 狀態列：顯示檔案數與訂單數
   importStatus.hidden = false;
   importStatus.textContent = '已載入 ' + fileNames.length + ' 個檔案，共 ' + orders.length +
@@ -462,6 +463,7 @@ function loadExample(data) {
   currentOrders = data;
   ensureOrderUids(currentOrders);  // 指派穩定 _uid 供跨分頁異常判定
   reviewStatus = {};  // 載入範例，清空舊的確認狀態
+  currentPage = 1;    // 回到第一頁
   importStatus.hidden = false;
   importStatus.textContent = '已載入範例資料，共 ' + data.length + ' 筆訂單' +
     (data.length > 5 ? '（預覽顯示前 5 筆）' : '') + '。';
@@ -581,10 +583,15 @@ function pick(obj, key) {
   return '';
 }
 
-// ===== 欄位對照 + 一單多列向下填補（fill-down） =====
+// ===== 欄位對照 + 一單多列合併 =====
+// 重要：Pinkoi 匯出會將「同一筆訂單的多個品項」拆成多列，且每列都重複收件人、
+// 地址、電話等資訊，僅第一列帶有訂單總金額。若以列為單位視為獨立訂單，會產生
+// 大量「重複訂單號」與「金額為 0」的假異常。因此以「訂單編號」為 key 合併同一單，
+// 後續相同編號的列只把商品併入 items，不重複計入金額。
 function cleanOrders(rows) {
   var headers = rows[0].map(function(h) { return String(h).toLowerCase().trim(); });
   var orders = [];
+  var orderMap = {};   // orderId -> order 物件，用於合併同一單的品項
   var lastOrder = null;
 
   for (var i = 1; i < rows.length; i++) {
@@ -599,16 +606,29 @@ function cleanOrders(rows) {
     var style = pick(obj, 'style');
     var qty = parseInt(pick(obj, 'quantity'), 10) || 1;
     var fullProduct = style ? (product + ' - ' + style) : product;
+    var amount = parseInt(pick(obj, 'amount'), 10) || 0;
 
-    // 判斷是否為明細列：訂單編號與上一筆相同（或空）且收件人為空 → 追加到上一筆
-    var isDetailRow = lastOrder && (recipient === '') && (orderId === '' || orderId === lastOrder.orderId);
+    // 決定這一列所屬的訂單：
+    // 1) 有訂單編號且已建立過 → 併入既有訂單（同一單的後續品項列）
+    // 2) 有訂單編號但沒建立過 → 建立新訂單
+    // 3) 沒有訂單編號 → 視為上一筆的明細列（fill-down），併入上一筆
+    var existing = orderId ? orderMap[orderId] : null;
 
-    if (isDetailRow) {
+    if (existing) {
+      // 同一訂單的後續品項列：只加商品；若主列缺金額而此列有，補上
+      if (fullProduct) existing.items.push({ product: fullProduct, quantity: qty });
+      if (!(existing.amount > 0) && amount > 0) existing.amount = amount;
+      lastOrder = existing;
+      continue;
+    }
+
+    if (!orderId && lastOrder) {
+      // 無編號的延續列：併入上一筆訂單
       if (fullProduct) lastOrder.items.push({ product: fullProduct, quantity: qty });
       continue;
     }
 
-    // 主列：建立新訂單。平台以訂單編號 # 前綴判斷
+    // 建立新訂單。平台以訂單編號 # 前綴判斷
     var platform = String(orderId).indexOf('#') === 0 ? 'CYBERBIZ' : 'Pinkoi';
     var order = {
       orderId: orderId,
@@ -618,10 +638,11 @@ function cleanOrders(rows) {
       phone: pick(obj, 'phone'),
       address: pick(obj, 'address'),
       logistics: pick(obj, 'logistics'),
-      amount: parseInt(pick(obj, 'amount'), 10) || 0,
+      amount: amount,
       items: fullProduct ? [{ product: fullProduct, quantity: qty }] : []
     };
     orders.push(order);
+    if (orderId) orderMap[orderId] = order;
     lastOrder = order;
   }
   return orders;
@@ -712,7 +733,11 @@ function detectOrderIssues(o, dupIds, todayEnd) {
 // 確認狀態儲存：key -> 'confirmed' | 'recheck'（未設定表示尚未處理）
 var reviewStatus = {};
 
-// ===== 清洗結果表格（一列一筆訂單，含異常警示） =====
+// ===== 分頁設定 =====
+var PAGE_SIZE = 20;       // 每頁顯示筆數
+var currentPage = 1;      // 目前頁碼（1-based）
+
+// ===== 清洗結果表格（一列一筆訂單，含異常警示、分頁顯示） =====
 function renderCleanedTable(orders) {
   ensureOrderUids(orders);
   var pf = document.getElementById('platform-filter').value;
@@ -723,14 +748,30 @@ function renderCleanedTable(orders) {
 
   var todayEnd = endOfToday();
 
-  // 統計各類異常數量（用於頂部彙總警示條 B），且僅計入尚未「確認無誤」的異常
+  // 第一階段：以「全部篩選後訂單」統計異常數量（不受分頁影響）
   var counts = { 'future-date': 0, 'zero-amount': 0, 'duplicate-id': 0 };
   var pendingIssueOrders = 0;
+  filtered.forEach(function(o) {
+    if (reviewStatus[orderKey(o)] === 'confirmed') return;
+    var iss = detectOrderIssues(o, dupIds, todayEnd);
+    if (iss.length > 0) {
+      pendingIssueOrders++;
+      iss.forEach(function(x) { counts[x.type]++; });
+    }
+  });
+
+  // 分頁計算：確保 currentPage 落在有效範圍
+  var totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  if (currentPage > totalPages) currentPage = totalPages;
+  if (currentPage < 1) currentPage = 1;
+  var startIdx = (currentPage - 1) * PAGE_SIZE;
+  var pageOrders = filtered.slice(startIdx, startIdx + PAGE_SIZE);
 
   var tbody = document.getElementById('cleaned-table').querySelector('tbody');
   tbody.innerHTML = '';
 
-  filtered.forEach(function(o, index) {
+  // 第二階段：只渲染目前頁的訂單列
+  pageOrders.forEach(function(o) {
     var key = orderKey(o);
     var issues = detectOrderIssues(o, dupIds, todayEnd);
     var status = reviewStatus[key] || (issues.length > 0 ? 'pending' : '');
@@ -811,7 +852,51 @@ function renderCleanedTable(orders) {
   });
 
   renderIssueSummary(counts, pendingIssueOrders);
+  renderPagination(filtered.length, totalPages, startIdx, pageOrders.length, orders);
   bindReviewActions(orders);
+}
+
+// ===== 分頁控制列 =====
+function renderPagination(totalCount, totalPages, startIdx, pageCount, orders) {
+  var el = document.getElementById('cleaned-pagination');
+  if (!el) return;
+
+  if (totalCount === 0) {
+    el.innerHTML = '';
+    return;
+  }
+
+  var from = startIdx + 1;
+  var to = startIdx + pageCount;
+  var info = '第 ' + from + '–' + to + ' 筆，共 ' + totalCount + ' 筆（第 ' +
+    currentPage + ' / ' + totalPages + ' 頁）';
+
+  var prevDisabled = currentPage <= 1 ? ' disabled' : '';
+  var nextDisabled = currentPage >= totalPages ? ' disabled' : '';
+
+  el.innerHTML =
+    '<span class="page-info">' + info + '</span>' +
+    '<div class="page-btns">' +
+      '<button class="page-btn" data-page="first"' + prevDisabled + ' aria-label="第一頁">« 第一頁</button>' +
+      '<button class="page-btn" data-page="prev"' + prevDisabled + ' aria-label="上一頁">‹ 上一頁</button>' +
+      '<button class="page-btn" data-page="next"' + nextDisabled + ' aria-label="下一頁">下一頁 ›</button>' +
+      '<button class="page-btn" data-page="last"' + nextDisabled + ' aria-label="最後一頁">最後一頁 »</button>' +
+    '</div>';
+
+  el.querySelectorAll('.page-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      if (btn.disabled) return;
+      var action = btn.dataset.page;
+      if (action === 'first') currentPage = 1;
+      else if (action === 'prev') currentPage = Math.max(1, currentPage - 1);
+      else if (action === 'next') currentPage = Math.min(totalPages, currentPage + 1);
+      else if (action === 'last') currentPage = totalPages;
+      renderCleanedTable(orders);
+      // 換頁後將表格捲回頂端，方便從頭檢查
+      var wrap = document.querySelector('#tab-import .table-wrapper');
+      if (wrap) wrap.scrollTop = 0;
+    });
+  });
 }
 
 // ===== 頂部彙總警示條（B） =====
@@ -881,6 +966,7 @@ function applyEdit(orders, key, field, value) {
 
 // ===== 平台篩選（清洗結果） =====
 document.getElementById('platform-filter').addEventListener('change', function() {
+  currentPage = 1;  // 切換平台後回到第一頁
   if (currentOrders.length > 0) renderCleanedTable(currentOrders);
 });
 
