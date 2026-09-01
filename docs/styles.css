@@ -368,6 +368,27 @@ td.cell-issue {
   cursor: not-allowed;
 }
 
+/* 頁碼按鈕 */
+.pagination .page-num {
+  min-width: 34px;
+  text-align: center;
+}
+.pagination .page-num.active {
+  background: #4a90d9;
+  color: #fff;
+  border-color: #4a90d9;
+  font-weight: bold;
+  cursor: default;
+}
+.pagination .page-num.active:hover {
+  background: #4a90d9;
+}
+.pagination .page-ellipsis {
+  padding: 0 4px;
+  color: #999;
+  align-self: center;
+}
+
 @media (max-width: 767px) {
   .pagination {
     flex-direction: column;

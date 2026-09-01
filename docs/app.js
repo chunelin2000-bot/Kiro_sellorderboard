@@ -570,7 +570,9 @@ var FIELD_ALIASES = {
   style:     ['商品款式', '商品規格', '款式', 'sku'],
   quantity:  ['數量', 'quantity', 'qty'],
   logistics: ['運送方式', '出貨方式', '寄送方式', '配送方式', '物流', 'logistics', 'shipping'],
-  amount:    ['總額', '訂單總金額', '總金額', '金額', 'amount', 'total']
+  amount:    ['訂單總金額', '總額', '總金額', '金額', 'amount', 'total'],
+  subtotal:  ['小計', 'subtotal', 'sub_total', 'line_total'],
+  unitPrice: ['商品單價', '單價', 'unit_price', 'price']
 };
 
 // 從一列物件中依別名取值（別名皆已小寫化比對）
@@ -607,28 +609,29 @@ function cleanOrders(rows) {
     var qty = parseInt(pick(obj, 'quantity'), 10) || 1;
     var fullProduct = style ? (product + ' - ' + style) : product;
     var amount = parseInt(pick(obj, 'amount'), 10) || 0;
+    // 該列小計（優先取「小計」欄；若無則以單價×數量估算），用於與訂單總金額比對
+    var lineSubtotal = parseFloat(pick(obj, 'subtotal'));
+    if (isNaN(lineSubtotal)) {
+      var unit = parseFloat(pick(obj, 'unitPrice'));
+      lineSubtotal = isNaN(unit) ? 0 : unit * qty;
+    }
 
     // 決定這一列所屬的訂單：
     // 1) 有訂單編號且已建立過 → 併入既有訂單（同一單的後續品項列）
-    // 2) 有訂單編號但沒建立過 → 建立新訂單
-    // 3) 沒有訂單編號 → 視為上一筆的明細列（fill-down），併入上一筆
+    // 2) 其餘（含有編號但未建立、以及無編號列）→ 各自建立獨立訂單
+    //    無編號列不再靜默併入上一筆，以便被標記為「缺少訂單編號」異常
     var existing = orderId ? orderMap[orderId] : null;
 
     if (existing) {
-      // 同一訂單的後續品項列：只加商品；若主列缺金額而此列有，補上
+      // 同一訂單的後續品項列：加商品、累加小計；若主列缺金額而此列有，補上
       if (fullProduct) existing.items.push({ product: fullProduct, quantity: qty });
+      existing.subtotalSum += lineSubtotal;
       if (!(existing.amount > 0) && amount > 0) existing.amount = amount;
       lastOrder = existing;
       continue;
     }
 
-    if (!orderId && lastOrder) {
-      // 無編號的延續列：併入上一筆訂單
-      if (fullProduct) lastOrder.items.push({ product: fullProduct, quantity: qty });
-      continue;
-    }
-
-    // 建立新訂單。平台以訂單編號 # 前綴判斷
+    // 建立新訂單。平台以訂單編號 # 前綴判斷（無編號預設 Pinkoi）
     var platform = String(orderId).indexOf('#') === 0 ? 'CYBERBIZ' : 'Pinkoi';
     var order = {
       orderId: orderId,
@@ -639,6 +642,7 @@ function cleanOrders(rows) {
       address: pick(obj, 'address'),
       logistics: pick(obj, 'logistics'),
       amount: amount,
+      subtotalSum: lineSubtotal,   // 明細小計加總，用於與 amount 比對
       items: fullProduct ? [{ product: fullProduct, quantity: qty }] : []
     };
     orders.push(order);
@@ -727,6 +731,22 @@ function detectOrderIssues(o, dupIds, todayEnd) {
     issues.push({ type: 'duplicate-id', field: 'orderId', message: '訂單編號重複（' + o.orderId + '），可能為重複匯入' });
   }
 
+  // 4. 缺少訂單編號（平台可能誤判為有效訂單）
+  if (!o.orderId) {
+    issues.push({ type: 'missing-id', field: 'orderId', message: '缺少訂單編號，可能為異常或不完整的訂單' });
+
+    // 5. 僅在「缺少訂單編號」時，額外檢查訂單金額與明細小計是否相符
+    //    （正常有編號的訂單，其總金額本就含運費/折扣，與小計不同屬正常，不檢查）
+    if (o.amount > 0 && o.subtotalSum > 0 && Math.abs(o.amount - o.subtotalSum) > 1) {
+      issues.push({
+        type: 'amount-mismatch',
+        field: 'amount',
+        message: '訂單金額（' + o.amount + '）與明細小計加總（' +
+          Math.round(o.subtotalSum) + '）不符，請核對'
+      });
+    }
+  }
+
   return issues;
 }
 
@@ -734,7 +754,7 @@ function detectOrderIssues(o, dupIds, todayEnd) {
 var reviewStatus = {};
 
 // ===== 分頁設定 =====
-var PAGE_SIZE = 20;       // 每頁顯示筆數
+var PAGE_SIZE = 15;       // 每頁顯示筆數
 var currentPage = 1;      // 目前頁碼（1-based）
 
 // ===== 清洗結果表格（一列一筆訂單，含異常警示、分頁顯示） =====
@@ -749,7 +769,7 @@ function renderCleanedTable(orders) {
   var todayEnd = endOfToday();
 
   // 第一階段：以「全部篩選後訂單」統計異常數量（不受分頁影響）
-  var counts = { 'future-date': 0, 'zero-amount': 0, 'duplicate-id': 0 };
+  var counts = { 'future-date': 0, 'zero-amount': 0, 'duplicate-id': 0, 'missing-id': 0, 'amount-mismatch': 0 };
   var pendingIssueOrders = 0;
   filtered.forEach(function(o) {
     if (reviewStatus[orderKey(o)] === 'confirmed') return;
@@ -874,11 +894,25 @@ function renderPagination(totalCount, totalPages, startIdx, pageCount, orders) {
   var prevDisabled = currentPage <= 1 ? ' disabled' : '';
   var nextDisabled = currentPage >= totalPages ? ' disabled' : '';
 
+  // 產生頁碼清單（滑動視窗）：永遠含第 1 與最後頁，目前頁前後各 2 頁，
+  // 中間跳號處以省略號 '…' 連接，避免頁數過多時按鈕爆量。
+  var pageItems = buildPageItems(currentPage, totalPages);
+  var numberBtns = pageItems.map(function(p) {
+    if (p === '...') {
+      return '<span class="page-ellipsis" aria-hidden="true">…</span>';
+    }
+    var activeCls = p === currentPage ? ' active' : '';
+    var current = p === currentPage ? ' aria-current="page"' : '';
+    return '<button class="page-btn page-num' + activeCls + '" data-page="' + p +
+      '"' + current + ' aria-label="第 ' + p + ' 頁">' + p + '</button>';
+  }).join('');
+
   el.innerHTML =
     '<span class="page-info">' + info + '</span>' +
     '<div class="page-btns">' +
       '<button class="page-btn" data-page="first"' + prevDisabled + ' aria-label="第一頁">« 第一頁</button>' +
       '<button class="page-btn" data-page="prev"' + prevDisabled + ' aria-label="上一頁">‹ 上一頁</button>' +
+      numberBtns +
       '<button class="page-btn" data-page="next"' + nextDisabled + ' aria-label="下一頁">下一頁 ›</button>' +
       '<button class="page-btn" data-page="last"' + nextDisabled + ' aria-label="最後一頁">最後一頁 »</button>' +
     '</div>';
@@ -891,12 +925,33 @@ function renderPagination(totalCount, totalPages, startIdx, pageCount, orders) {
       else if (action === 'prev') currentPage = Math.max(1, currentPage - 1);
       else if (action === 'next') currentPage = Math.min(totalPages, currentPage + 1);
       else if (action === 'last') currentPage = totalPages;
+      else {
+        // 直接點選頁碼
+        var target = parseInt(action, 10);
+        if (!isNaN(target)) currentPage = Math.min(totalPages, Math.max(1, target));
+      }
       renderCleanedTable(orders);
       // 換頁後將表格捲回頂端，方便從頭檢查
       var wrap = document.querySelector('#tab-import .table-wrapper');
       if (wrap) wrap.scrollTop = 0;
     });
   });
+}
+
+// 產生分頁頁碼清單：回傳含數字與 '...' 的陣列（滑動視窗，目前頁前後各 2 頁）
+function buildPageItems(current, total) {
+  var items = [];
+  var windowSize = 2;                 // 目前頁前後各顯示的頁數
+  var left = Math.max(2, current - windowSize);
+  var right = Math.min(total - 1, current + windowSize);
+
+  items.push(1);                      // 永遠顯示第 1 頁
+  if (left > 2) items.push('...');    // 第 1 頁與視窗之間有跳號
+  for (var p = left; p <= right; p++) items.push(p);
+  if (right < total - 1) items.push('...');  // 視窗與最後頁之間有跳號
+  if (total > 1) items.push(total);   // 永遠顯示最後一頁（total>1 時）
+
+  return items;
 }
 
 // ===== 頂部彙總警示條（B） =====
@@ -914,6 +969,8 @@ function renderIssueSummary(counts, pendingIssueOrders) {
   if (counts['future-date'] > 0) parts.push('未來日期 ' + counts['future-date'] + ' 筆');
   if (counts['zero-amount'] > 0) parts.push('金額為 0 ' + counts['zero-amount'] + ' 筆');
   if (counts['duplicate-id'] > 0) parts.push('重複訂單號 ' + counts['duplicate-id'] + ' 筆');
+  if (counts['missing-id'] > 0) parts.push('缺少訂單編號 ' + counts['missing-id'] + ' 筆');
+  if (counts['amount-mismatch'] > 0) parts.push('金額與小計不符 ' + counts['amount-mismatch'] + ' 筆');
 
   el.className = 'issue-summary warn';
   el.textContent = '⚠ 發現 ' + pendingIssueOrders + ' 筆訂單有異常（' + parts.join('、') +
@@ -1221,7 +1278,7 @@ function renderDashboardIssueNotice(flagged) {
   }
 
   // 依類型統計被排除的異常
-  var counts = { 'future-date': 0, 'zero-amount': 0, 'duplicate-id': 0 };
+  var counts = { 'future-date': 0, 'zero-amount': 0, 'duplicate-id': 0, 'missing-id': 0, 'amount-mismatch': 0 };
   flagged.forEach(function(f) {
     f.issues.forEach(function(iss) { if (counts[iss.type] != null) counts[iss.type]++; });
   });
@@ -1229,6 +1286,8 @@ function renderDashboardIssueNotice(flagged) {
   if (counts['future-date'] > 0) parts.push('未來日期 ' + counts['future-date'] + ' 筆');
   if (counts['zero-amount'] > 0) parts.push('金額為 0 ' + counts['zero-amount'] + ' 筆');
   if (counts['duplicate-id'] > 0) parts.push('重複訂單號 ' + counts['duplicate-id'] + ' 筆');
+  if (counts['missing-id'] > 0) parts.push('缺少訂單編號 ' + counts['missing-id'] + ' 筆');
+  if (counts['amount-mismatch'] > 0) parts.push('金額與小計不符 ' + counts['amount-mismatch'] + ' 筆');
 
   el.className = 'issue-summary warn';
   el.textContent = '⚠ 已排除 ' + flagged.length + ' 筆未確認異常訂單，不列入下方統計（' +
