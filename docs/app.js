@@ -46,6 +46,26 @@ var mockCyberbiz = [
   { orderId: "#1224", platform: "CYBERBIZ", date: "2024-03-27", recipient: "賴思穎", phone: "0900-111-224", address: "台南市中西區府前路一段150號", logistics: "順豐物流配送", amount: 780, items: [{ product: "陶瓷手沖咖啡杯", quantity: 1 }] }
 ];
 
+// Shopee 範例資料（僅供銷售分析展示；蝦皮不透過本系統出貨）
+// 金額以「買家總支付金額」為準；物流為蝦皮店到店/宅配
+var mockShopee = [
+  // 2024-01
+  { orderId: "2401SP0001", platform: "Shopee", date: "2024-01-08", recipient: "周雅雯", phone: "0911-201-001", address: "台北市中山區南京東路二段10號", logistics: "蝦皮店到店-7-11", amount: 780, items: [{ product: "手工香氛蠟燭", quantity: 1 }] },
+  { orderId: "2401SP0002", platform: "Shopee", date: "2024-01-13", recipient: "郭立群", phone: "0911-201-002", address: "新北市中和區中正路200號", logistics: "宅配", amount: 1560, items: [{ product: "陶瓷手沖咖啡杯", quantity: 2 }] },
+  { orderId: "2401SP0003", platform: "Shopee", date: "2024-01-19", recipient: "簡孟樺", phone: "0911-201-003", address: "台中市西屯區market路30號", logistics: "蝦皮店到店-全家", amount: 445, items: [{ product: "手工香氛蠟燭", quantity: 1 }] },
+  { orderId: "2401SP0004", platform: "Shopee", date: "2024-01-26", recipient: "田佳蓉", phone: "0911-201-004", address: "高雄市苓雅區成功一路50號", logistics: "蝦皮店到店-7-11", amount: 960, items: [{ product: "木質桌上收納盒", quantity: 3 }] },
+  // 2024-02
+  { orderId: "2402SP0005", platform: "Shopee", date: "2024-02-05", recipient: "史念慈", phone: "0911-201-005", address: "台北市大安區復興南路一段80號", logistics: "宅配", amount: 1280, items: [{ product: "皮革筆記本", quantity: 1 }] },
+  { orderId: "2402SP0006", platform: "Shopee", date: "2024-02-12", recipient: "邱柏翰", phone: "0911-201-006", address: "桃園市中壢區中華路二段90號", logistics: "蝦皮店到店-7-11", amount: 890, items: [{ product: "手工香氛蠟燭", quantity: 2 }] },
+  { orderId: "2402SP0007", platform: "Shopee", date: "2024-02-18", recipient: "周雅雯", phone: "0911-201-001", address: "台北市中山區南京東路二段10號", logistics: "蝦皮店到店-7-11", amount: 1140, items: [{ product: "植物染圍巾", quantity: 3 }] },
+  { orderId: "2402SP0008", platform: "Shopee", date: "2024-02-25", recipient: "翁瑋辰", phone: "0911-201-008", address: "台南市北區成功路120號", logistics: "蝦皮店到店-全家", amount: 600, items: [{ product: "純棉手帕禮盒", quantity: 3 }] },
+  // 2024-03
+  { orderId: "2403SP0009", platform: "Shopee", date: "2024-03-06", recipient: "范姜宇", phone: "0911-201-009", address: "新竹市東區光復路二段60號", logistics: "宅配", amount: 1560, items: [{ product: "陶瓷手沖咖啡杯", quantity: 2 }] },
+  { orderId: "2403SP0010", platform: "Shopee", date: "2024-03-14", recipient: "邱柏翰", phone: "0911-201-006", address: "桃園市中壢區中華路二段90號", logistics: "蝦皮店到店-7-11", amount: 445, items: [{ product: "手工香氛蠟燭", quantity: 1 }] },
+  { orderId: "2403SP0011", platform: "Shopee", date: "2024-03-22", recipient: "湯士賢", phone: "0911-201-011", address: "台中市北區三民路三段140號", logistics: "蝦皮店到店-萊爾富", amount: 1160, items: [{ product: "陶瓷手沖咖啡杯", quantity: 1 }, { product: "手工香氛蠟燭", quantity: 1 }] },
+  { orderId: "2403SP0012", platform: "Shopee", date: "2024-03-28", recipient: "田佳蓉", phone: "0911-201-004", address: "高雄市苓雅區成功一路50號", logistics: "宅配", amount: 780, items: [{ product: "植物染圍巾", quantity: 2 }] }
+];
+
 // ===== HTML 跳脫（防 XSS） =====
 function escapeHtml(str) {
   return String(str)
@@ -453,9 +473,9 @@ function colRefToIndex(ref) {
   return idx - 1;
 }
 
-// ===== 載入範例（Pinkoi + CYBERBIZ 合併，供展示用） =====
+// ===== 載入範例（Pinkoi + CYBERBIZ + Shopee 合併，供展示用） =====
 document.getElementById('btn-example').addEventListener('click', function() {
-  loadExample(mockPinkoi.concat(mockCyberbiz));
+  loadExample(mockPinkoi.concat(mockCyberbiz).concat(mockShopee));
 });
 
 function loadExample(data) {
@@ -559,19 +579,22 @@ function renderPreviewFromOrders(orders) {
   });
 }
 
-// ===== 欄位別名對照表（涵蓋 Pinkoi 與 CYBERBIZ 真實匯出欄位名） =====
+// ===== 欄位別名對照表（涵蓋 Pinkoi、CYBERBIZ、Shopee 真實匯出欄位名） =====
+// 注意：金額類欄位順序即優先序。Shopee 有多個金額欄，需以「買家總支付金額」為營業額，
+// 故置於 amount 別名最前面優先比對。
 var FIELD_ALIASES = {
   orderId:   ['訂單編號', 'orderid', 'order_id'],
   date:      ['訂單成立日期', '訂購日期', '訂單日期', '時間', '日期', 'date', 'order_date'],
-  recipient: ['收件人姓名', '收件人名稱', '收件人', 'recipient', 'name'],
-  phone:     ['收件人電話', '聯絡電話', '電話', 'phone', 'tel'],
-  address:   ['收件人地址', '收件地址', '地址', 'address'],
+  recipient: ['收件者姓名', '收件人姓名', '收件人名稱', '收件人', 'recipient', 'name'],
+  phone:     ['收件者電話', '收件人電話', '聯絡電話', '電話', 'phone', 'tel'],
+  address:   ['收件地址', '收件人地址', '地址', 'address'],
   product:   ['商品名稱', '商品名稱 / 規格', '購買品項', '商品', 'product', 'item'],
-  style:     ['商品款式', '商品規格', '款式'],
-  sku:       ['sku', '商品編號', '貨號'],
+  style:     ['商品選項名稱', '商品款式', '商品規格', '款式'],
+  sku:       ['sku', '主商品貨號', '商品選項貨號', '商品編號', '貨號'],
   quantity:  ['數量', 'quantity', 'qty'],
   logistics: ['運送方式', '出貨方式', '寄送方式', '配送方式', '物流', 'logistics', 'shipping'],
-  amount:    ['訂單總金額', '總額', '總金額', '金額', 'amount', 'total'],
+  // 買家總支付金額(Shopee)優先；其次各平台的訂單總額
+  amount:    ['買家總支付金額', '訂單總金額', '總額', '總金額', '金額', 'amount', 'total'],
   subtotal:  ['小計', 'subtotal', 'sub_total', 'line_total'],
   unitPrice: ['商品售價', '商品單價', '單價', 'unit_price', 'price'],
   // CYBERBIZ 訂單明細專用欄位
@@ -583,14 +606,46 @@ var FIELD_ALIASES = {
   trackingNo: ['托運單號', '託運單號', 'tracking_no']
 };
 
-// 從一列物件中依別名取值（別名皆已小寫化比對）
+// 從一列物件中依別名取值。比對策略（由嚴到寬，避免誤抓）：
+// 1) 完全相等  2) 欄名以別名開頭（處理 Shopee 含換行說明的超長欄名，如「收件者電話\n\n(...)」）
 function pick(obj, key) {
   var aliases = FIELD_ALIASES[key];
+  var headers = Object.keys(obj);
+  // 先做完全相等比對（優先序即別名順序）
   for (var i = 0; i < aliases.length; i++) {
     var a = aliases[i].toLowerCase();
     if (obj[a] !== undefined && obj[a] !== '') return obj[a];
   }
+  // 再做「欄名開頭符合別名」比對，解決含說明文字的超長欄名
+  for (var j = 0; j < aliases.length; j++) {
+    var alias = aliases[j].toLowerCase();
+    for (var h = 0; h < headers.length; h++) {
+      var head = headers[h];
+      if (head.indexOf(alias) === 0 && obj[head] !== undefined && obj[head] !== '') {
+        return obj[head];
+      }
+    }
+  }
   return '';
+}
+
+// 依標題列特徵判斷平台；目前僅 Shopee 有明確可辨識的獨有欄位，
+// 其他平台回傳 null（交由訂單編號規則判斷 CYBERBIZ/Pinkoi）
+function detectPlatformFromHeaders(headers) {
+  var set = {};
+  headers.forEach(function(h) { set[h] = true; });
+  // Shopee 匯出特有欄位（任二命中即判定為 Shopee，避免單一欄位巧合）
+  var shopeeHints = ['買家帳號', '買家總支付金額', '蝦幣折抵', '蝦皮補助運費', '蝦皮補貼金額'];
+  var hit = 0;
+  shopeeHints.forEach(function(k) {
+    if (set[k]) hit++;
+    else {
+      // 欄名可能含前後說明，改用開頭比對
+      for (var i = 0; i < headers.length; i++) { if (headers[i].indexOf(k) === 0) { hit++; break; } }
+    }
+  });
+  if (hit >= 2) return 'Shopee';
+  return null;
 }
 
 // ===== 欄位對照 + 一單多列合併 =====
@@ -603,6 +658,9 @@ function cleanOrders(rows) {
   var orders = [];
   var orderMap = {};   // orderId -> order 物件，用於合併同一單的品項
   var lastOrder = null;
+
+  // 依標題列特徵判斷整份檔案的來源平台（Shopee 有獨有欄位，最可靠）
+  var filePlatform = detectPlatformFromHeaders(headers);
 
   for (var i = 1; i < rows.length; i++) {
     var row = rows[i];
@@ -646,8 +704,10 @@ function cleanOrders(rows) {
       continue;
     }
 
-    // 建立新訂單。平台以訂單編號 # 前綴判斷（無編號預設 Pinkoi）
-    var platform = String(orderId).indexOf('#') === 0 ? 'CYBERBIZ' : 'Pinkoi';
+    // 建立新訂單。平台判定：檔案為 Shopee 則全部標記 Shopee；
+    // 否則以訂單編號 # 前綴判斷（有 #→CYBERBIZ、無→Pinkoi）
+    var platform = filePlatform ||
+      (String(orderId).indexOf('#') === 0 ? 'CYBERBIZ' : 'Pinkoi');
     var shippingFee = parseFloat(pick(obj, 'shipping'));
     var order = {
       orderId: orderId,
@@ -1077,10 +1137,12 @@ function shippingCategory(logistics) {
 }
 
 // 依所選平台與出貨方式篩選目前訂單
+// 出貨列印預設排除 Shopee（蝦皮不透過本系統出貨，僅納入銷售分析）
 function filteredDocOrders() {
   var pf = docPlatformSelect.value;
   var ship = docShippingSelect ? docShippingSelect.value : 'all';
   return currentOrders.filter(function(o) {
+    if (o.platform === 'Shopee') return false;
     if (pf !== 'all' && o.platform !== pf) return false;
     if (ship !== 'all' && shippingCategory(o.logistics) !== ship) return false;
     return true;
