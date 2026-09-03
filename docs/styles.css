@@ -584,6 +584,54 @@ tr.picking-issue td:first-child::before {
   margin-top: 8px;
 }
 
+/* === CYBERBIZ 訂單明細版面 === */
+.order-detail h5 {
+  margin: 14px 0 6px;
+  font-size: 14px;
+  border-bottom: 1px solid #ccc;
+  padding-bottom: 3px;
+}
+.order-detail .od-meta {
+  margin: 2px 0;
+}
+.order-detail table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  margin-bottom: 8px;
+}
+.order-detail .od-items th,
+.order-detail .od-items td {
+  border-bottom: 1px solid #e0e0e0;
+  padding: 6px 8px;
+  text-align: left;
+}
+.order-detail .od-items th {
+  border-bottom: 1px solid #999;
+  font-weight: bold;
+}
+.order-detail td.num,
+.order-detail th.num {
+  text-align: right;
+  white-space: nowrap;
+}
+/* 金額摘要與配送資訊：兩欄式 */
+.order-detail .od-summary td,
+.order-detail .od-ship td {
+  padding: 5px 8px;
+  border-bottom: 1px solid #eee;
+  vertical-align: top;
+}
+.order-detail .od-summary .lbl,
+.order-detail .od-ship .lbl {
+  color: #555;
+  width: 40%;
+}
+.order-detail .od-summary tr:last-child td,
+.order-detail .od-ship tr:last-child td {
+  border-bottom: none;
+}
+
 /* === 摘要卡片 === */
 .summary-cards {
   display: flex;

@@ -17,7 +17,8 @@
     {"tasks": [7]},
     {"tasks": [8]},
     {"tasks": [9]},
-    {"tasks": [10]}
+    {"tasks": [10]},
+    {"tasks": [11]}
   ]
 }
 ```
@@ -134,6 +135,16 @@
   - **Requirements:** AC-3.6, AC-4.5
   - **Verification:** 120 筆出貨單分 12 頁、每頁 10 筆；頁碼可點選跳頁且邊界安全；揀貨單不分頁；列印不含分頁列；Console 無錯誤
 
+- [x] 11. CYBERBIZ 出貨單改為「訂單明細」版面
+  - `FIELD_ALIASES` 新增 sku／unitPrice(商品售價)／subtotal(小計)／shipping(運費)／bonusUsed(訂單總紅利換購點數)／bonusEarn(可獲得紅利)／shipDate／shipTime／trackingNo；並將 sku 從 style 別名獨立出來
+  - `cleanOrders`：品項改存 {product, quantity, sku, unitPrice, subtotal}（保留 product 字串相容既有功能）；訂單層級存運費／紅利／配送資訊
+  - `buildShippingHtml` 依平台分流：CYBERBIZ 走 `buildCyberbizLabel`（訂單明細版面），其他平台走 `buildDefaultLabel`（原版）
+  - 訂單明細含商品明細表格、金額摘要、紅利點數、配送資訊；缺漏欄位以「—」留白（`dash`/`ntd` 輔助）
+  - 補 mockCyberbiz 前三筆的紅利/單價/SKU/配送示意資料，供範例展示新版面
+  - 新增訂單明細版面 CSS（表格化商品明細、金額摘要、配送資訊）
+  - **Requirements:** AC-3.7, AC-3.8
+  - **Verification:** CYBERBIZ 訂單以訂單明細版面呈現、含紅利點數；缺資料顯示「—」；Pinkoi 維持原出貨單；異常標示與分頁仍作用；Console 無錯誤
+
 ## Notes
 - 每個 Task 完成後可獨立 commit
 - Task 4 為驗收性質，可能產生回頭修改 Task 1-3 的需求
@@ -142,4 +153,5 @@
 - Task 8 為實際檔案再驗證後的調整：新增缺少訂單編號與金額不符的偵測（金額比對限縮在缺編號時）、分頁改 15 筆並支援直接點選頁碼
 - Task 9 為銷售分析擴充：新客／回購客分析與回購率趨勢；客戶以電話＋姓名識別，受平台欄位遮罩影響為近似值
 - Task 10 為出貨列印分頁：出貨單每頁 10 筆便於逐筆異常檢查；揀貨單為彙總視圖不分頁
+- Task 11 為 CYBERBIZ 出貨單客製：改用「訂單明細」版面並加入紅利點數，供消費者參考；其他平台版面不變
 - 不引入任何外部套件或 CDN

@@ -27,9 +27,9 @@ var mockPinkoi = [
 
 var mockCyberbiz = [
   // 2024-01
-  { orderId: "#1201", platform: "CYBERBIZ", date: "2024-01-10", recipient: "陳大文", phone: "0900-111-201", address: "台中市太平區育才路446號", logistics: "7-11貨到付款", amount: 890, items: [{ product: "手工香氛蠟燭", quantity: 2 }] },
-  { orderId: "#1202", platform: "CYBERBIZ", date: "2024-01-11", recipient: "林小美", phone: "0900-111-202", address: "台北市大同區重慶北路二段50號", logistics: "宅配", amount: 1840, items: [{ product: "陶瓷手沖咖啡杯", quantity: 1 }, { product: "皮革筆記本", quantity: 1 }] },
-  { orderId: "#1203", platform: "CYBERBIZ", date: "2024-01-15", recipient: "黃志明", phone: "0900-111-203", address: "新北市新莊區中正路100號", logistics: "全家取貨不付款", amount: 380, items: [{ product: "植物染圍巾", quantity: 1 }] },
+  { orderId: "#1201", platform: "CYBERBIZ", date: "2024-01-10", recipient: "陳大文", phone: "0900-111-201", address: "台中市太平區育才路446號", logistics: "7-11貨到付款", amount: 890, shipping: 0, bonusUsed: "0點", bonusEarn: "8點", shipDate: "依實際出貨日期為準", shipTime: "不限時", trackingNo: "7-11 交貨便F15362391767", items: [{ product: "手工香氛蠟燭", quantity: 2, sku: "AY-CANDLE-01", unitPrice: 445, subtotal: 890 }] },
+  { orderId: "#1202", platform: "CYBERBIZ", date: "2024-01-11", recipient: "林小美", phone: "0900-111-202", address: "台北市大同區重慶北路二段50號", logistics: "宅配", amount: 1840, shipping: 0, bonusUsed: "0點", bonusEarn: "18點", shipDate: "依實際出貨日期為準", shipTime: "不限時", trackingNo: "", items: [{ product: "陶瓷手沖咖啡杯", quantity: 1, sku: "AY-CUP-02", unitPrice: 780, subtotal: 780 }, { product: "皮革筆記本", quantity: 1, sku: "AY-NB-03", unitPrice: 1060, subtotal: 1060 }] },
+  { orderId: "#1203", platform: "CYBERBIZ", date: "2024-01-15", recipient: "黃志明", phone: "0900-111-203", address: "新北市新莊區中正路100號", logistics: "全家取貨不付款", amount: 380, shipping: 60, bonusUsed: "0點", bonusEarn: "3點", shipDate: "依實際出貨日期為準", shipTime: "不限時", trackingNo: "", items: [{ product: "植物染圍巾", quantity: 1, sku: "AY-SCARF-04", unitPrice: 320, subtotal: 320 }] },
   { orderId: "#1204", platform: "CYBERBIZ", date: "2024-01-20", recipient: "吳雅琪", phone: "0900-111-204", address: "桃園市中壢區環中東路200號", logistics: "順豐物流配送", amount: 320, items: [{ product: "木質桌上收納盒", quantity: 1 }] },
   { orderId: "#1205", platform: "CYBERBIZ", date: "2024-01-25", recipient: "張家豪", phone: "0900-111-205", address: "台南市永康區中華路400號", logistics: "7-11取貨不付款", amount: 450, items: [{ product: "純棉手帕禮盒", quantity: 3 }] },
   // 2024-02
@@ -567,12 +567,20 @@ var FIELD_ALIASES = {
   phone:     ['收件人電話', '聯絡電話', '電話', 'phone', 'tel'],
   address:   ['收件人地址', '收件地址', '地址', 'address'],
   product:   ['商品名稱', '商品名稱 / 規格', '購買品項', '商品', 'product', 'item'],
-  style:     ['商品款式', '商品規格', '款式', 'sku'],
+  style:     ['商品款式', '商品規格', '款式'],
+  sku:       ['sku', '商品編號', '貨號'],
   quantity:  ['數量', 'quantity', 'qty'],
   logistics: ['運送方式', '出貨方式', '寄送方式', '配送方式', '物流', 'logistics', 'shipping'],
   amount:    ['訂單總金額', '總額', '總金額', '金額', 'amount', 'total'],
   subtotal:  ['小計', 'subtotal', 'sub_total', 'line_total'],
-  unitPrice: ['商品單價', '單價', 'unit_price', 'price']
+  unitPrice: ['商品售價', '商品單價', '單價', 'unit_price', 'price'],
+  // CYBERBIZ 訂單明細專用欄位
+  shipping:  ['運費', 'shipping_fee', 'freight'],
+  bonusUsed: ['訂單總紅利換購點數', '總紅利換購點數', '紅利換購點數'],
+  bonusEarn: ['可獲得紅利', '預計獲得紅利', '獲得紅利'],
+  shipDate:  ['指定配送日期', '配送日期'],
+  shipTime:  ['指定配送時段', '配送時段'],
+  trackingNo: ['托運單號', '託運單號', 'tracking_no']
 };
 
 // 從一列物件中依別名取值（別名皆已小寫化比對）
@@ -606,14 +614,21 @@ function cleanOrders(rows) {
     var recipient = pick(obj, 'recipient');
     var product = pick(obj, 'product');
     var style = pick(obj, 'style');
+    var sku = pick(obj, 'sku');
     var qty = parseInt(pick(obj, 'quantity'), 10) || 1;
     var fullProduct = style ? (product + ' - ' + style) : product;
     var amount = parseInt(pick(obj, 'amount'), 10) || 0;
+    var unitPrice = parseFloat(pick(obj, 'unitPrice'));
+    if (isNaN(unitPrice)) unitPrice = null;
     // 該列小計（優先取「小計」欄；若無則以單價×數量估算），用於與訂單總金額比對
     var lineSubtotal = parseFloat(pick(obj, 'subtotal'));
     if (isNaN(lineSubtotal)) {
-      var unit = parseFloat(pick(obj, 'unitPrice'));
-      lineSubtotal = isNaN(unit) ? 0 : unit * qty;
+      lineSubtotal = (unitPrice != null) ? unitPrice * qty : 0;
+    }
+
+    // 品項物件：product 為顯示字串（相容既有功能）；另存 sku/unitPrice/subtotal 供 CYBERBIZ 訂單明細用
+    function makeItem() {
+      return { product: fullProduct, quantity: qty, sku: sku || '', unitPrice: unitPrice, subtotal: lineSubtotal || null };
     }
 
     // 決定這一列所屬的訂單：
@@ -624,7 +639,7 @@ function cleanOrders(rows) {
 
     if (existing) {
       // 同一訂單的後續品項列：加商品、累加小計；若主列缺金額而此列有，補上
-      if (fullProduct) existing.items.push({ product: fullProduct, quantity: qty });
+      if (fullProduct) existing.items.push(makeItem());
       existing.subtotalSum += lineSubtotal;
       if (!(existing.amount > 0) && amount > 0) existing.amount = amount;
       lastOrder = existing;
@@ -633,6 +648,7 @@ function cleanOrders(rows) {
 
     // 建立新訂單。平台以訂單編號 # 前綴判斷（無編號預設 Pinkoi）
     var platform = String(orderId).indexOf('#') === 0 ? 'CYBERBIZ' : 'Pinkoi';
+    var shippingFee = parseFloat(pick(obj, 'shipping'));
     var order = {
       orderId: orderId,
       platform: platform,
@@ -643,7 +659,14 @@ function cleanOrders(rows) {
       logistics: pick(obj, 'logistics'),
       amount: amount,
       subtotalSum: lineSubtotal,   // 明細小計加總，用於與 amount 比對
-      items: fullProduct ? [{ product: fullProduct, quantity: qty }] : []
+      items: fullProduct ? [makeItem()] : [],
+      // CYBERBIZ 訂單明細欄位（其他平台通常為空，顯示時留白）
+      shipping: isNaN(shippingFee) ? null : shippingFee,
+      bonusUsed: pick(obj, 'bonusUsed'),
+      bonusEarn: pick(obj, 'bonusEarn'),
+      shipDate: pick(obj, 'shipDate'),
+      shipTime: pick(obj, 'shipTime'),
+      trackingNo: pick(obj, 'trackingNo')
     };
     orders.push(order);
     if (orderId) orderMap[orderId] = order;
@@ -1051,11 +1074,19 @@ function docIssueBanner(flaggedCount) {
     '建議先至「訂單匯入」確認或修正後再出貨，避免出錯貨或重複出貨。</div>';
 }
 
-// 產生出貨單 HTML（一筆訂單一張，含訂單日期與多項商品；異常訂單加標示）
+// 顯示值：空值統一以「—」呈現（供訂單明細留白使用）
+function dash(v) {
+  return (v === null || v === undefined || String(v).trim() === '') ? '—' : escapeHtml(String(v));
+}
+// 金額顯示：數字→NT$ 千分位；無值→「—」
+function ntd(v) {
+  return (v === null || v === undefined || v === '' || isNaN(v)) ? '—' : 'NT$' + Number(v).toLocaleString();
+}
+
+// 產生出貨單 HTML（一筆訂單一張；CYBERBIZ 使用「訂單明細」版面，其他平台維持原版）
 // skipBanner：分頁模式下由外層統一顯示彙總提示，這裡不再重複輸出
 function buildShippingHtml(orders, skipBanner) {
   var split = splitByIssues(orders);
-  // 建立 uid -> issues 對照，方便逐筆查詢
   var issueMap = {};
   split.flagged.forEach(function(f) { issueMap[orderKey(f.order)] = f.issues; });
 
@@ -1063,40 +1094,116 @@ function buildShippingHtml(orders, skipBanner) {
 
   orders.forEach(function(o) {
     var issues = issueMap[orderKey(o)] || [];
-    var hasIssue = issues.length > 0;
-    var fieldIssue = {};
-    issues.forEach(function(iss) { fieldIssue[iss.field] = iss; });
-
-    var itemRows = o.items.map(function(it) {
-      return '<li>' + escapeHtml(it.product) + ' × ' + it.quantity + '</li>';
-    }).join('');
-
-    // 各欄位標示：異常欄位前加 ⚠
-    function line(label, field, value) {
-      var mark = fieldIssue[field] ? '<span class="doc-warn-tag">⚠</span> ' : '';
-      return '<p><strong>' + label + '：</strong>' + mark + escapeHtml(value) + '</p>';
+    if (o.platform === 'CYBERBIZ') {
+      html += buildCyberbizLabel(o, issues);
+    } else {
+      html += buildDefaultLabel(o, issues);
     }
-
-    var issueNotice = '';
-    if (hasIssue) {
-      var msgs = issues.map(function(iss) { return escapeHtml(iss.message); }).join('；');
-      issueNotice = '<p class="label-issue-notice">⚠ 異常提醒：' + msgs + '</p>';
-    }
-
-    html += '<div class="shipping-label' + (hasIssue ? ' label-issue' : '') + '">' +
-      '<h4>出貨單</h4>' +
-      issueNotice +
-      line('訂單編號', 'orderId', o.orderId) +
-      '<p><strong>平台：</strong>' + escapeHtml(o.platform) + '</p>' +
-      line('訂單日期', 'date', o.date) +
-      '<p><strong>收件人：</strong>' + escapeHtml(o.recipient) + '</p>' +
-      '<p><strong>電話：</strong>' + escapeHtml(o.phone) + '</p>' +
-      '<p><strong>地址：</strong>' + escapeHtml(o.address) + '</p>' +
-      '<p><strong>商品明細：</strong></p><ul>' + itemRows + '</ul>' +
-      '<p><strong>物流方式：</strong>' + escapeHtml(o.logistics) + '</p>' +
-      '</div>';
   });
   return html;
+}
+
+// 一般平台（Pinkoi 等）出貨單版面（維持原本樣式）
+function buildDefaultLabel(o, issues) {
+  var hasIssue = issues.length > 0;
+  var fieldIssue = {};
+  issues.forEach(function(iss) { fieldIssue[iss.field] = iss; });
+
+  var itemRows = o.items.map(function(it) {
+    return '<li>' + escapeHtml(it.product) + ' × ' + it.quantity + '</li>';
+  }).join('');
+
+  function line(label, field, value) {
+    var mark = fieldIssue[field] ? '<span class="doc-warn-tag">⚠</span> ' : '';
+    return '<p><strong>' + label + '：</strong>' + mark + escapeHtml(value) + '</p>';
+  }
+
+  var issueNotice = '';
+  if (hasIssue) {
+    var msgs = issues.map(function(iss) { return escapeHtml(iss.message); }).join('；');
+    issueNotice = '<p class="label-issue-notice">⚠ 異常提醒：' + msgs + '</p>';
+  }
+
+  return '<div class="shipping-label' + (hasIssue ? ' label-issue' : '') + '">' +
+    '<h4>出貨單</h4>' +
+    issueNotice +
+    line('訂單編號', 'orderId', o.orderId) +
+    '<p><strong>平台：</strong>' + escapeHtml(o.platform) + '</p>' +
+    line('訂單日期', 'date', o.date) +
+    '<p><strong>收件人：</strong>' + escapeHtml(o.recipient) + '</p>' +
+    '<p><strong>電話：</strong>' + escapeHtml(o.phone) + '</p>' +
+    '<p><strong>地址：</strong>' + escapeHtml(o.address) + '</p>' +
+    '<p><strong>商品明細：</strong></p><ul>' + itemRows + '</ul>' +
+    '<p><strong>物流方式：</strong>' + escapeHtml(o.logistics) + '</p>' +
+    '</div>';
+}
+
+// CYBERBIZ「訂單明細」版面（含商品明細表格、金額、紅利點數、配送資訊）
+function buildCyberbizLabel(o, issues) {
+  var hasIssue = issues.length > 0;
+  var fieldIssue = {};
+  issues.forEach(function(iss) { fieldIssue[iss.field] = iss; });
+  function mark(field) { return fieldIssue[field] ? '<span class="doc-warn-tag">⚠</span> ' : ''; }
+
+  var issueNotice = '';
+  if (hasIssue) {
+    var msgs = issues.map(function(iss) { return escapeHtml(iss.message); }).join('；');
+    issueNotice = '<p class="label-issue-notice">⚠ 異常提醒：' + msgs + '</p>';
+  }
+
+  // 商品明細表格
+  var totalQty = 0;
+  var itemRows = o.items.map(function(it) {
+    totalQty += it.quantity;
+    return '<tr>' +
+      '<td>' + escapeHtml(it.product) + '</td>' +
+      '<td>' + dash(it.sku) + '</td>' +
+      '<td class="num">' + ntd(it.unitPrice) + '</td>' +
+      '<td class="num">' + it.quantity + '</td>' +
+      '<td class="num">' + ntd(it.subtotal) + '</td>' +
+      '</tr>';
+  }).join('');
+
+  var itemsTable =
+    '<table class="od-items"><thead><tr>' +
+      '<th>商品名稱 / 規格</th><th>SKU</th><th class="num">單價</th><th class="num">數量</th><th class="num">小計</th>' +
+    '</tr></thead><tbody>' + itemRows + '</tbody></table>';
+
+  // 金額摘要（小計以品項小計加總；缺值以總額回推）
+  var subtotal = o.subtotalSum > 0 ? o.subtotalSum : null;
+  var amountCell = mark('amount') + ntd(o.amount);
+
+  var summary =
+    '<table class="od-summary">' +
+      '<tr><td class="lbl">小計</td><td class="num">' + ntd(subtotal) + '</td></tr>' +
+      '<tr><td class="lbl">運費</td><td class="num">' + ntd(o.shipping) + '</td></tr>' +
+      '<tr><td class="lbl">訂單總金額（共 ' + totalQty + ' 件）</td><td class="num">' + amountCell + '</td></tr>' +
+      '<tr><td class="lbl">總紅利換購點數</td><td class="num">' + dash(o.bonusUsed) + '</td></tr>' +
+      '<tr><td class="lbl">預計獲得紅利</td><td class="num">' + dash(o.bonusEarn) + '</td></tr>' +
+    '</table>';
+
+  // 配送資訊表格
+  var shipping =
+    '<h5>配送資訊</h5>' +
+    '<table class="od-ship">' +
+      '<tr><td class="lbl">收件人</td><td>' + dash(o.recipient) + '</td></tr>' +
+      '<tr><td class="lbl">聯絡電話</td><td>' + dash(o.phone) + '</td></tr>' +
+      '<tr><td class="lbl">收件地址</td><td>' + dash(o.address) + '</td></tr>' +
+      '<tr><td class="lbl">配送方式</td><td>' + dash(o.logistics) + '</td></tr>' +
+      '<tr><td class="lbl">指定配送日期</td><td>' + dash(o.shipDate) + '</td></tr>' +
+      '<tr><td class="lbl">指定配送時段</td><td>' + dash(o.shipTime) + '</td></tr>' +
+      '<tr><td class="lbl">託運單號</td><td>' + dash(o.trackingNo) + '</td></tr>' +
+    '</table>';
+
+  return '<div class="shipping-label order-detail' + (hasIssue ? ' label-issue' : '') + '">' +
+    '<h4>訂單明細</h4>' +
+    issueNotice +
+    '<p class="od-meta"><strong>訂單編號：</strong>' + mark('orderId') + escapeHtml(o.orderId || '—') + '</p>' +
+    '<p class="od-meta"><strong>訂單日期：</strong>' + mark('date') + escapeHtml(o.date || '—') + '</p>' +
+    '<h5>商品明細</h5>' + itemsTable +
+    summary +
+    shipping +
+    '</div>';
 }
 
 // 產生揀貨單 HTML（依商品彙總；含異常訂單的商品加註記）
