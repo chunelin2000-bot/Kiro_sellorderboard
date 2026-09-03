@@ -1050,9 +1050,10 @@ document.getElementById('platform-filter').addEventListener('change', function()
   if (currentOrders.length > 0) renderCleanedTable(currentOrders);
 });
 
-// ===== 出貨列印：以下拉選單切換單據類型與平台，共用單一顯示區 =====
+// ===== 出貨列印：以下拉選單切換單據類型、平台與出貨方式，共用單一顯示區 =====
 var docTypeSelect = document.getElementById('doc-type');
 var docPlatformSelect = document.getElementById('doc-platform');
+var docShippingSelect = document.getElementById('doc-shipping');
 var docArea = document.getElementById('doc-area');
 var btnGenerate = document.getElementById('btn-generate');
 var btnPrintDoc = document.getElementById('btn-print-doc');
@@ -1060,10 +1061,30 @@ var btnPrintDoc = document.getElementById('btn-print-doc');
 var DOC_PAGE_SIZE = 10;   // 出貨單每頁筆數
 var docPage = 1;          // 出貨單目前頁碼
 
-// 依所選平台篩選目前訂單
+// 依出貨方式文字判斷分類：seven/family/hilife/ok/home/sf/other
+// logistics 為自由文字（如「7-11貨到付款」「全家取貨不付款」「順豐物流配送」「宅配」）
+function shippingCategory(logistics) {
+  var s = String(logistics || '').toLowerCase();
+  if (s.indexOf('7-11') !== -1 || s.indexOf('711') !== -1 || s.indexOf('7‑11') !== -1 ||
+      s.indexOf('統一') !== -1 || s.indexOf('ibon') !== -1 || s.indexOf('交貨便') !== -1) return 'seven';
+  if (s.indexOf('全家') !== -1 || s.indexOf('family') !== -1) return 'family';
+  if (s.indexOf('萊爾富') !== -1 || s.indexOf('hi-life') !== -1 || s.indexOf('hilife') !== -1) return 'hilife';
+  if (s.indexOf('ok') !== -1 || s.indexOf('okmart') !== -1) return 'ok';
+  if (s.indexOf('順豐') !== -1 || s.indexOf('sf') !== -1) return 'sf';
+  if (s.indexOf('宅配') !== -1 || s.indexOf('黑貓') !== -1 || s.indexOf('新竹') !== -1 ||
+      s.indexOf('郵局') !== -1 || s.indexOf('宅急便') !== -1 || s.indexOf('基本運送') !== -1) return 'home';
+  return 'other';
+}
+
+// 依所選平台與出貨方式篩選目前訂單
 function filteredDocOrders() {
   var pf = docPlatformSelect.value;
-  return pf === 'all' ? currentOrders : currentOrders.filter(function(o) { return o.platform === pf; });
+  var ship = docShippingSelect ? docShippingSelect.value : 'all';
+  return currentOrders.filter(function(o) {
+    if (pf !== 'all' && o.platform !== pf) return false;
+    if (ship !== 'all' && shippingCategory(o.logistics) !== ship) return false;
+    return true;
+  });
 }
 
 // 出貨列印區的異常彙總提示條（含未確認異常時顯示）
@@ -1355,6 +1376,14 @@ docPlatformSelect.addEventListener('change', function() {
   docPage = 1;
   resetDocArea();
 });
+
+// 切換出貨方式時同樣清空顯示區
+if (docShippingSelect) {
+  docShippingSelect.addEventListener('change', function() {
+    docPage = 1;
+    resetDocArea();
+  });
+}
 
 // 列印目前顯示的單據
 btnPrintDoc.addEventListener('click', function() {
